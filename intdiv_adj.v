@@ -57,7 +57,7 @@ module intdiv_adj(xmsb, ymsb, sign_r1, sgn_rc0, sgn_rs0, padj, seladj);
 		if (ymsb == `POSITIVE) padj <= `ON;
 		else padj <= `OFF;
 	end
-	else
+	else begin
 		seladj <= 1'b1;
 		padj <= `OFF;
 	end
@@ -65,7 +65,6 @@ module intdiv_adj(xmsb, ymsb, sign_r1, sgn_rc0, sgn_rs0, padj, seladj);
   end
 
 endmodule
-
 
 //test bench
 module intdiv_adj_tb();
@@ -86,33 +85,38 @@ module intdiv_adj_tb();
 	.seladj(seladj_tb)
 	);
 
-  integer i, j;
+  //integer i;
 
   initial
   begin
-	xmsb_tb = `POSITIVE;
+	ymsb_tb = `POSITIVE;
+	sgn_rc0_tb = `ZERO;
+	sgn_rs0_tb = `ZERO;
 	sign_r1_tb = `POSITIVE;
-	for(i=0; i<32; i=i+1)
-	begin
-	  #10;
 
-	end
+	xmsb_tb = `POSITIVE;
+	#10;
+	sign_r1_tb = `POSITIVE;	sgn_rc0_tb = `NEG1;
+	#10;
+	sign_r1_tb = `NEGATIVE;	sgn_rc0_tb = `POS1_1;
+	#10;
+	ymsb_tb = `NEGATIVE;
+	#10;
+	sign_r1_tb = `NEGATIVE;	sgn_rc0_tb = `NEG1;
+	#100;
+	xmsb_tb = `NEGATIVE;
+	#10;
+	ymsb_tb = `POSITIVE;
+	#10;
+	sign_r1_tb = `NEGATIVE;	sgn_rc0_tb = `ZERO;
+	#10;
+	sgn_rs0_tb = `NEG1;
+	#10;
+	sign_r1_tb = `NEGATIVE;	sgn_rc0_tb = `NEG1;
+	#10;
+	ymsb_tb = `NEGATIVE;
+	#10;
   $stop;
   end
 
-  initial
-  begin
-	{ps_tb, tr_tb} = 2'b00;
-	sign_in_tb = `ZERO;
-        for(i = 0; i < 4; i = i+1)
-        begin
-		for(j = 0; j < 4; j = j+1)
-		begin
-			#100;
-			{ps_tb, tr_tb} = {ps_tb, tr_tb}+1'b1;
-		end
-		sign_in_tb = sign_in_tb+1'b1;
-	end
-
-  end
 endmodule

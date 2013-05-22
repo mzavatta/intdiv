@@ -14,16 +14,15 @@
 
 module intdiv_intdiv(x, y, z, r);
 
-  parameter WIDTH=4;
+  parameter N=4;
 
   // IN
-  input [WIDTH-1:0] x;
-  input [WIDTH-1:0] y;
+  input [N-1:0] x;
+  input [N-1:0] y;
   // OUT
-  output [WIDTH-1:0] z;
-  output [WIDTH-1:0] z;
+  output [N-1:0] z;
 
-
+  /*
   genvar i, j;
   generate for (i=-1; i<=WIDTH-2; i=i+1) begin: row
 	for (j=0; j<=WIDTH-2; j=j+1) begin: col
@@ -32,28 +31,48 @@ module intdiv_intdiv(x, y, z, r);
 	end
   end
   endgenerate
+  */
 
+  wire d[N-2:0];
 
+  wire [1:0] rc[N-1:0][N-2:0]; //N iterations, N-1 bits wide numbers
 
-(ps, tr, sign_in, res, sign_out);
+  wire [1:0] sprop[N-1:0][N-1:0];
+  wire ps[N-2:0][N-2:0];
+  wire tr[N-2:0][N-2:0];
+
+  wire [1:0] xneg[N-2:0];
+  wire p[N-1:0];
+
+  wire sign[N-1:0];
+
+  wire padj, seladj;
+
   genvar i, j;
-  generate for (i=WIDTH-1; i>=0; i=i-1) begin: row
+  generate for (i=N-1; i>=0; i=i-1) begin: row
+
 	intdiv_abs ovf();
-	intdiv_sgn sgn();
-	intdiv_neg neg();
-	xor cmpp();
+
+	if (i!=0) begin
+		if (i==WIDTH-1) intdiv_sgn sgn(sprop[i][0], x[i], sign[i]); //(sgn_cur, sign_prec, out);
+		else intdiv_sgn sgn(sprop[i][0], sign[i+1], sign[i]);
+		intdiv_neg neg(x[i-1], sign[i], xneg[i-1]); //(xbit, sign, y);
+		xor cmpp(p[i], sign[i], y[N-1]);
+	end
+	else intdiv_adj(x[N-1], y[N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
+
 	for (j=WIDTH-2; j>=0; j=j-1) begin: col
-		if (i==WIDTH-1) begin
+		if (i==WIDTH-1) begin //upper row
 			if (j==0) intdiv_abs abs(d[j], y[N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost 
-			else intdiv_abs abs(d[j], d[j-1], sprop[i][j+1], rc[i][j], sprop[i][j+1]);
+			else intdiv_abs abs(d[j], d[j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 		end
 		else begin
 			if (j==0) begin //rightmost
-			intdiv_sub sub(d[j], );  //(sub, min, sum, tr)
+			intdiv_sub sub(d[j], xneg[i], ps[i][j], tr[i][j]);
 			intdiv_abs abs(ps[i][j], y[N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 			else begin
-			intdiv_sub sub(d[j], );
+			intdiv_sub sub(d[j], rc[i-1][j-1], ps[i][j], tr[i][j]);
 			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end

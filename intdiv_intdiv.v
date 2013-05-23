@@ -35,9 +35,12 @@ module intdiv_intdiv(x, y, z, r);
 
   wire d[N-2:0];
 
+  //TODO: might not be right N-2...look at OVF output into NEG-CONV
   wire [1:0] rc[N-1:0][N-2:0]; //N iterations, N-1 bits wide numbers
+  wire [1:0] rs[N-2:0];
 
   wire [1:0] sprop[N-1:0][N-1:0];
+  wire [1:0] ssprop[N-1:0];
   wire ps[N-2:0][N-2:0];
   wire tr[N-2:0][N-2:0];
 
@@ -48,21 +51,38 @@ module intdiv_intdiv(x, y, z, r);
 
   wire padj, seladj;
 
+  wire [1:0] fakeovfout[N-1:0];
+  wire fakeovfsout;
+
+  /* any row i has:
+   * if first row: cmp, abs, neg, sgn, cmp
+   * if last one: sub, abs, adj
+   * if any other: sub, abs, neg, sgn, cmp
+   * 
+   * Items are numbered with the same indexes of the elemets that generate them
+   * Indexes decrease from left to right
+   * An input that comes from the same row but different coloumn, will be i,j+1
+   * Outputs of cells in position i,j will get i,j as indexes
+   * (neg cell is a special case)
+   */
+
+
   genvar i, j;
   generate for (i=N-1; i>=0; i=i-1) begin: row
 
-	intdiv_abs ovf();
+	intdiv_abs ovf(1'b0, 1'b0, 2'b00, fakeovfout[i], sprop[i][N-1]);  //(ps, tr, sign_in, res, sign_out)
 
 	if (i!=0) begin
-		if (i==WIDTH-1) intdiv_sgn sgn(sprop[i][0], x[i], sign[i]); //(sgn_cur, sign_prec, out);
+		if (i==N-1) intdiv_sgn sgn(sprop[i][0], x[i], sign[i]); //(sgn_cur, sign_prec, out);
 		else intdiv_sgn sgn(sprop[i][0], sign[i+1], sign[i]);
 		intdiv_neg neg(x[i-1], sign[i], xneg[i-1]); //(xbit, sign, y);
 		xor cmpp(p[i], sign[i], y[N-1]);
 	end
 	else intdiv_adj(x[N-1], y[N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
 
-	for (j=WIDTH-2; j>=0; j=j-1) begin: col
-		if (i==WIDTH-1) begin //upper row
+	for (j=N-2; j>=0; j=j-1) begin: col
+		if (i==N-1) begin //upper row
+			xor cmpy(d[j], y[N-1], y[j]);
 			if (j==0) intdiv_abs abs(d[j], y[N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost 
 			else intdiv_abs abs(d[j], d[j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 		end
@@ -79,6 +99,14 @@ module intdiv_intdiv(x, y, z, r);
 		//xor cmpy(out[j], i0[j], i1[j]);
 	end
   end
+
+  for (j=N-1; j>=0; j=j-1) begin: star
+	if (j<N-1) intdiv_sub sub(d[j], rc[0][j], psl[j], trl[j]);
+	if (j==N-1) intdiv_abs abs(1'b0, trl[j-1], 2'b00, fakeovfsout, ssprop[j]); //TODO
+	else if (j==0) intdiv_abs abs(psl[j], y[N-1], ssprop[j+1], rs[j], ssprop[j]);
+	else intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
+  end
+
   endgenerate
 
 

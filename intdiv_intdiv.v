@@ -12,7 +12,7 @@
 `define NEGATIVE 1'b1
 `define POSITIVE 1'b0
 
-module intdiv_intdiv(x, y, z/*, r*/);
+module intdiv_intdiv(x, y, z/*,r*/);
 
   parameter N=5;
 
@@ -22,21 +22,11 @@ module intdiv_intdiv(x, y, z/*, r*/);
   // OUT
   output [N-1:0] z;
 
-  /*
-  genvar i, j;
-  generate for (i=-1; i<=WIDTH-2; i=i+1) begin: row
-	for (j=0; j<=WIDTH-2; j=j+1) begin: col
-
-		xor cmpy(out[j], i0[j], i1[j]);
-	end
-  end
-  endgenerate
-  */
-
   wire [N-2:0] d;
 
   wire [1:0] rc[N-1:0][N-2:0]; //N iterations, N-1 bits wide numbers
   wire [1:0] rs[N-2:0];
+  wire [1:0] r[N-2:0];
 
   wire [1:0] sprop[N-1:0][N-1:0];
   wire [1:0] ssprop[N-1:0];
@@ -55,16 +45,16 @@ module intdiv_intdiv(x, y, z/*, r*/);
   wire [1:0] fakeovfout[N-1:0];
   wire fakeovfsout;
 
-  /* any row i has:
+  /* any row i includes:
    * if first row: cmp, abs, neg, sgn, cmp
    * if last one: sub, abs, adj
    * if any other: sub, abs, neg, sgn, cmp
    * 
-   * Items are numbered with the same indexes of the elemets that generate them
+   * Signals are numbered with the same indexes of the elemets that generate them
    * Indexes decrease from left to right
-   * An input that comes from the same row but different coloumn, will be i,j+1
-   * Outputs of cells in position i,j will get i,j as indexes
-   * (neg cell is a special case)
+   * An input that comes to the cell from the same row but previous coloumn will be (i,j+1)
+   * Outputs of cells in position (i,j) will get (i,j) as indexes
+   * (neg cells are a special case)
    */
 
   genvar i, j;
@@ -72,13 +62,13 @@ module intdiv_intdiv(x, y, z/*, r*/);
 
   for (i=N-1; i>=0; i=i-1) begin: row
 
-	intdiv_abs ovf(1'b0, 1'b0, 2'b00, fakeovfout[i], sprop[i][N-1]);  //(ps, tr, sign_in, res, sign_out)
+	intdiv_abs ovf(1'b0, 1'b0, 2'b00, fakeovfout[i], sprop[i][N-1]);
 
 	if (i!=0) begin
-		if (i==N-1) intdiv_sgn sgn(sprop[i][0], x[i], sign[i]); //(sgn_cur, sign_prec, out);
+		if (i==N-1) intdiv_sgn sgn(sprop[i][0], x[i], sign[i]);
 		else intdiv_sgn sgn(sprop[i][0], sign[i+1], sign[i]);
-		intdiv_neg neg(x[i-1], sign[i], xneg[i-1]); //(xbit, sign, y);
-		xor cmpp(p[i], sign[i], y[N-1]);
+		intdiv_neg neg(x[i-1], sign[i], xneg[i-1]);
+		xnor cmpp(p[i], sign[i], y[N-1]);
 	end
 	else intdiv_adj adj(x[N-1], y[N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
 
@@ -98,7 +88,6 @@ module intdiv_intdiv(x, y, z/*, r*/);
 			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end
-		//xor cmpy(out[j], i0[j], i1[j]);
 	end
   end
 
@@ -109,8 +98,11 @@ module intdiv_intdiv(x, y, z/*, r*/);
 	else intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
   end
 
-  endgenerate
+  for (j=N-2; j>=0; j=j-1) begin: mux
+	assign r[j] = seladj ? rc[0][j] : rs[j];
+  end
 
+  endgenerate
   
   intdiv_padj #(.WIDTH(N-1)) 
 	padjuster (
@@ -118,7 +110,6 @@ module intdiv_intdiv(x, y, z/*, r*/);
 	.res(z[N-1:1]),
 	.enable(padj)
 	);
-
   assign z[0] = seladj;
 
 endmodule

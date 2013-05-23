@@ -8,52 +8,52 @@
 
 module intdiv_sub(sub, min, sum, tr);
   // IN
-  input [1:0] sub; //sd2
-  input min;
+  input [1:0] min; //sd2
+  input sub;
   // OUT
   output sum;
   output tr;
 
-  wire [1:0] sub;
-  wire min;
+  wire [1:0] min;
+  wire sub;
 
   // TABLE II.a Takagi et al.
-  assign tr = (sub[1] & sub[0]) | (~sub[1] & ~sub[0] & min);
-  assign sum = (sub[1] & sub[0] & ~min) | (~sub[1] & ~sub[0] & min) | (~sub[1] & sub[0] & ~min) | (sub[1] & ~sub[0] & ~min);
+  assign tr = (min[1] & min[0]) | (~min[1] & ~min[0] & sub);
+  assign sum = (min[1] & min[0] & ~sub) | (~min[1] & ~min[0] & sub) | (~min[1] & min[0] & ~sub) | (min[1] & ~min[0] & ~sub);
 endmodule
 
 //test bench
 module intdiv_sub_tb();
-  reg sub1_tb, sub0_tb, min_tb;
+  reg min1_tb, min0_tb, sub_tb;
   wire sum_tb, tr_tb;
 
   intdiv_sub ids(
-	.sub({sub1_tb, sub0_tb}),
-	.min(min_tb),
+	.sub({min1_tb, min0_tb}),
+	.min(sub_tb),
 	.sum(sum_tb),
 	.tr(tr_tb)
 	);
 
   initial
   begin
-	{sub1_tb, sub0_tb} = `ZERO;
-	min_tb = 1'b0;
+	{min1_tb, min0_tb} = `ZERO;
+	sub_tb = 1'b0;
 	#100;
-	{sub1_tb, sub0_tb} = `POS1_1;
+	{min1_tb, min0_tb} = `POS1_1;
 	#100;
-	{sub1_tb, sub0_tb} = `NEG1;
+	{min1_tb, min0_tb} = `NEG1;
 	#100;
-	{sub1_tb, sub0_tb} = `POS1_2;
+	{min1_tb, min0_tb} = `POS1_2;
 	#100;
-	min_tb = 1'b1;
+	sub_tb = 1'b1;
 	#100;
-	{sub1_tb, sub0_tb} = `ZERO;
+	{min1_tb, min0_tb} = `ZERO;
 	#100;
-	{sub1_tb, sub0_tb} = `POS1_1;
+	{min1_tb, min0_tb} = `POS1_1;
 	#100;
-	{sub1_tb, sub0_tb} = `NEG1;
+	{min1_tb, min0_tb} = `NEG1;
 	#100;
-	{sub1_tb, sub0_tb} = `POS1_2;
+	{min1_tb, min0_tb} = `POS1_2;
 	#100;
 	$stop;
   end

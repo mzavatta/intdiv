@@ -12,9 +12,9 @@
 `define NEGATIVE 1'b1
 `define POSITIVE 1'b0
 
-module intdiv_intdiv(x, y, z, r);
+module intdiv_intdiv(x, y, z/*, r*/);
 
-  parameter N=4;
+  parameter N=5;
 
   // IN
   input [N-1:0] x;
@@ -33,9 +33,8 @@ module intdiv_intdiv(x, y, z, r);
   endgenerate
   */
 
-  wire d[N-2:0];
+  wire [N-2:0] d;
 
-  //TODO: might not be right N-2...look at OVF output into NEG-CONV
   wire [1:0] rc[N-1:0][N-2:0]; //N iterations, N-1 bits wide numbers
   wire [1:0] rs[N-2:0];
 
@@ -43,9 +42,11 @@ module intdiv_intdiv(x, y, z, r);
   wire [1:0] ssprop[N-1:0];
   wire ps[N-2:0][N-2:0];
   wire tr[N-2:0][N-2:0];
+  wire psl[N-2:0];
+  wire trl[N-2:0];
 
   wire [1:0] xneg[N-2:0];
-  wire p[N-1:0];
+  wire [N-1:0] p;
 
   wire sign[N-1:0];
 
@@ -66,9 +67,10 @@ module intdiv_intdiv(x, y, z, r);
    * (neg cell is a special case)
    */
 
-
   genvar i, j;
-  generate for (i=N-1; i>=0; i=i-1) begin: row
+  generate
+
+  for (i=N-1; i>=0; i=i-1) begin: row
 
 	intdiv_abs ovf(1'b0, 1'b0, 2'b00, fakeovfout[i], sprop[i][N-1]);  //(ps, tr, sign_in, res, sign_out)
 
@@ -78,7 +80,7 @@ module intdiv_intdiv(x, y, z, r);
 		intdiv_neg neg(x[i-1], sign[i], xneg[i-1]); //(xbit, sign, y);
 		xor cmpp(p[i], sign[i], y[N-1]);
 	end
-	else intdiv_adj(x[N-1], y[N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
+	else intdiv_adj adj(x[N-1], y[N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
 
 	for (j=N-2; j>=0; j=j-1) begin: col
 		if (i==N-1) begin //upper row
@@ -92,7 +94,7 @@ module intdiv_intdiv(x, y, z, r);
 			intdiv_abs abs(ps[i][j], y[N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 			else begin
-			intdiv_sub sub(d[j], rc[i-1][j-1], ps[i][j], tr[i][j]);
+			intdiv_sub sub(d[j], rc[i+1][j-1], ps[i][j], tr[i][j]);
 			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end
@@ -102,31 +104,55 @@ module intdiv_intdiv(x, y, z, r);
 
   for (j=N-1; j>=0; j=j-1) begin: star
 	if (j<N-1) intdiv_sub sub(d[j], rc[0][j], psl[j], trl[j]);
-	if (j==N-1) intdiv_abs abs(1'b0, trl[j-1], 2'b00, fakeovfsout, ssprop[j]); //TODO
+	if (j==N-1) intdiv_abs abs(1'b0, trl[j-1], 2'b00, fakeovfsout, ssprop[j]);
 	else if (j==0) intdiv_abs abs(psl[j], y[N-1], ssprop[j+1], rs[j], ssprop[j]);
 	else intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
   end
 
   endgenerate
 
+  
+  intdiv_padj #(.WIDTH(N-1)) 
+	padjuster (
+	.op(p[N-1:1]),
+	.res(z[N-1:1]),
+	.enable(padj)
+	);
 
-  wire d0, d1, d2;
-  xor cmp13(d2, y[2], y[3]);
-  xor cmp12(d1, y[1], y[3]);
-  xor cmp11(d0, y[0], y[3]);
+  assign z[0] = seladj;
 
-	(ps, tr, sign_in, res, sign_out);
-  wire [1:0] sprop13, [1:0] sprop12, [1:0] sprop11, [1:0] sprop10;
-  wire [1:0] rc12, [1:0] rc11, [1:0] rc10;
-  intdiv_abs ovf1(d2, .., .., .., sprop13);
-  intdiv_abs abs13(d1, d2, sprop13, rc12, sprop12);
-  intdiv_abs abs12(d0, d1, sprop12, rc11, sprop11);
-  intdiv_abs abs11(y[3], d0, sprop11, rc10, sprop10);
+endmodule
 
-  wire ps10, ps11, ps12, ps13;
-  wire tr10, tr11, tr12, tr13;
-  wire 
-  intdiv_sub sub11(d0, ..); intdiv_sub(sub, min, sum, tr);
-  intdiv_sub sub11(d1, rc10,  ..);
+//test bench
+module intdiv_intdiv_tb();
+
+  parameter N = 5;
+  reg [N-1:0] x_tb;
+  reg [N-1:0] y_tb;
+  wire [N-1:0] z_tb;
+
+  intdiv_intdiv #(.N(N)) 
+	intdiv (
+	.x(x_tb),
+	.y(y_tb),
+	.z(z_tb)
+	);
+
+  initial
+  begin
+  x_tb = 5'b00111;
+  y_tb = 5'b00011;
+  #100;
+  x_tb = 5'b00111;
+  y_tb = 5'b00010;
+  #100;
+  x_tb = 5'b01000;
+  y_tb = 5'b00010;
+  #100;
+  x_tb = 5'b00111;
+  y_tb = 5'b00001;
+  #100;
+  $stop;
+  end
 
 endmodule

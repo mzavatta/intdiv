@@ -27,6 +27,7 @@ module intdiv_intdiv(x, y, z/*,r*/);
   wire [1:0] rc[N-1:0][N-1:0]; //N iterations, N-1 bits wide numbers
   wire [1:0] rs[N-1:0];
   wire [1:0] r[N-1:0];
+  wire [1:0] radj[N-1:0];
 
   wire [1:0] sprop[N-1:0][N-1:0];
   wire [1:0] ssprop[N-1:0];
@@ -112,6 +113,8 @@ module intdiv_intdiv(x, y, z/*,r*/);
 
   for (j=N-1; j>=0; j=j-1) begin: mux
 	assign r[j] = seladj ? rc[0][j] : rs[j];
+	//module intdiv_sdcmp(op, res, enable);
+	intdiv_sdcmp negconv(r[j], radj[j], x[N-1]);	
   end
 
   endgenerate
@@ -193,6 +196,27 @@ module intdiv_intdiv_tb();
   #100;
   x_tb = 5'b11001;
   y_tb = 5'b00011;
+  #100;
+  x_tb = 5'b10001;
+  y_tb = 5'b01111;
+  #100;
+  x_tb = 5'b11001;
+  y_tb = 5'b11100;
+  #100;
+  x_tb = 5'b11111;
+  y_tb = 5'b00001;
+  #100;
+  x_tb = 5'b00001;
+  y_tb = 5'b11111;
+  #100;
+  x_tb = 5'b00001;
+  y_tb = 5'b10001;
+  #100;
+  x_tb = 5'b00101;
+  y_tb = 5'b10001;
+  #100;
+  x_tb = 5'b10101;
+  y_tb = 5'b10001;
   #100;
   $stop;
   end

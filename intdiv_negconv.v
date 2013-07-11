@@ -30,13 +30,14 @@ module intdiv_negconv(op, res, enable);
 endmodule
 */
 
+//for the moment only does a negation of a digit if enable is high
 module intdiv_sdcmp(op, res, enable);
 
   //IN
   input [1:0] op;
   input enable;
   // OUT
-  input [1:0] res;
+  output [1:0] res;
 
   reg [1:0] res;
   always @(op or enable)
@@ -60,5 +61,5 @@ module intdiv_sdcmp(op, res, enable);
     else res <= op;
   end
 
-endmodule;
+endmodule
 

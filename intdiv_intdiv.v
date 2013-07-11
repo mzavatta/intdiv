@@ -24,14 +24,14 @@ module intdiv_intdiv(x, y, z/*,r*/);
 
   wire [N-2:0] d;
 
-  wire [1:0] rc[N-1:0][N-2:0]; //N iterations, N-1 bits wide numbers
-  wire [1:0] rs[N-2:0];
-  wire [1:0] r[N-2:0];
+  wire [1:0] rc[N-1:0][N-1:0]; //N iterations, N-1 bits wide numbers
+  wire [1:0] rs[N-1:0];
+  wire [1:0] r[N-1:0];
 
   wire [1:0] sprop[N-1:0][N-1:0];
   wire [1:0] ssprop[N-1:0];
-  wire ps[N-2:0][N-2:0];
-  wire tr[N-2:0][N-2:0];
+  wire ps[N-1:0][N-2:0];
+  wire tr[N-1:0][N-2:0];
   wire psl[N-2:0];
   wire trl[N-2:0];
 
@@ -43,7 +43,9 @@ module intdiv_intdiv(x, y, z/*,r*/);
   wire padj, seladj;
 
   wire [1:0] fakeovfout[N-1:0];
-  wire fakeovfsout;
+  wire wrong[N-1:0];
+  wire [1:0] lastovf;
+  wire lastovfs;
 
   /* any row i includes:
    * if first row: cmp, abs, neg, sgn, cmp
@@ -62,21 +64,30 @@ module intdiv_intdiv(x, y, z/*,r*/);
 
   for (i=N-1; i>=0; i=i-1) begin: row
 
-	intdiv_abs ovf(1'b0, 1'b0, 2'b00, fakeovfout[i], sprop[i][N-1]);
+	//intdiv_abs ovf(1'b0, 1'b0, 2'b00, fakeovfout[i], sprop[i][N-1]); //tr[N-2], fakeovfout[i+1], rc[i+1][j-1]
+	//module intdiv_ovf(minm, minl, tr, res, sign_out, wrong);
+	if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
+	else intdiv_ovf ovf(rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 
 	if (i!=0) begin
 		if (i==N-1) intdiv_sgn sgn(sprop[i][0], x[i], sign[i]);
 		else intdiv_sgn sgn(sprop[i][0], sign[i+1], sign[i]);
 		intdiv_neg neg(x[i-1], sign[i], xneg[i-1]);
-		xnor cmpp(p[i], sign[i], y[N-1]);
+		xnor cmpp(p[i], sign[i], y[N-1]); //positive numbers version working with xnor
 	end
 	else intdiv_adj adj(x[N-1], y[N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
 
 	for (j=N-2; j>=0; j=j-1) begin: col
 		if (i==N-1) begin //upper row
 			xor cmpy(d[j], y[N-1], y[j]);
-			if (j==0) intdiv_abs abs(d[j], y[N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost 
-			else intdiv_abs abs(d[j], d[j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
+			if (j==0) begin
+				intdiv_sub sub(d[j], {1'b0, x[N-1]}, ps[i][j], tr[i][j]);
+				intdiv_abs abs(ps[i][j], y[N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost
+			end
+			else begin
+				intdiv_sub sub(d[j], 2'b00, ps[i][j], tr[i][j]);
+				intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
+			end
 		end
 		else begin
 			if (j==0) begin //rightmost
@@ -91,14 +102,15 @@ module intdiv_intdiv(x, y, z/*,r*/);
 	end
   end
 
+  assign lastovf = rc[0][N-1];
   for (j=N-1; j>=0; j=j-1) begin: star
 	if (j<N-1) intdiv_sub sub(d[j], rc[0][j], psl[j], trl[j]);
-	if (j==N-1) intdiv_abs abs(1'b0, trl[j-1], 2'b00, fakeovfsout, ssprop[j]);
+	if (j==N-1) intdiv_abs abs(lastovf[0], trl[j-1], 2'b00, rs[j], ssprop[j]);
 	else if (j==0) intdiv_abs abs(psl[j], y[N-1], ssprop[j+1], rs[j], ssprop[j]);
 	else intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
   end
 
-  for (j=N-2; j>=0; j=j-1) begin: mux
+  for (j=N-1; j>=0; j=j-1) begin: mux
 	assign r[j] = seladj ? rc[0][j] : rs[j];
   end
 
@@ -142,6 +154,45 @@ module intdiv_intdiv_tb();
   #100;
   x_tb = 5'b00111;
   y_tb = 5'b00001;
+  #100;
+  x_tb = 5'b00111;
+  y_tb = 5'b00001;
+  #100;
+  x_tb = 5'b01110;
+  y_tb = 5'b00101;
+  #100;
+  x_tb = 5'b01110;
+  y_tb = 5'b01001;
+  #100;
+  x_tb = 5'b01010;
+  y_tb = 5'b00111;
+  #100;
+  x_tb = 5'b01100;
+  y_tb = 5'b00011;
+  #100;
+  x_tb = 5'b00011;
+  y_tb = 5'b01110;
+  #100;
+  x_tb = 5'b00100;
+  y_tb = 5'b01010;
+  #100;
+  x_tb = 5'b00110;
+  y_tb = 5'b01111;
+  #100;
+  x_tb = 5'b01111;
+  y_tb = 5'b01111;
+  #100;
+  x_tb = 5'b00000;
+  y_tb = 5'b01111;
+  #100;
+  x_tb = 5'b01111;
+  y_tb = 5'b00000;
+  #100;
+  x_tb = 5'b11011;
+  y_tb = 5'b00011;
+  #100;
+  x_tb = 5'b11001;
+  y_tb = 5'b00011;
   #100;
   $stop;
   end

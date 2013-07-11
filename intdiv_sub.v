@@ -23,6 +23,7 @@ module intdiv_sub(sub, min, sum, tr);
 endmodule
 
 //test bench
+//FIXME: rework tb minuend and subtrahend
 module intdiv_sub_tb();
   reg min1_tb, min0_tb, sub_tb;
   wire sum_tb, tr_tb;

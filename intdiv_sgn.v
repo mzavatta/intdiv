@@ -19,6 +19,13 @@ module intdiv_sgn(sgn_cur, sign_prec, out);
   wire [1:0] sgn_cur;
   wire sign_prec;
   
+  /*
+  assign out = (sign_prec & ~sgn_cur[1] & sgn_cur[0]) |
+		(sign_prec & sgn_cur[1] & ~sgn_cur[0]) |
+		(~sign_prec & sgn_cur[1] & sgn_cur[0]);
+		// | (~sgn_cur[1] & ~sgn_cur[0]);
+  */
+
   assign out = (sign_prec & ~sgn_cur[1] & sgn_cur[0]) |
 		(sign_prec & sgn_cur[1] & ~sgn_cur[0]) |
 		(~sign_prec & sgn_cur[1] & sgn_cur[0]);

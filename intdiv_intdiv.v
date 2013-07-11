@@ -17,17 +17,17 @@ module intdiv_intdiv(x, y, z/*,r*/);
   parameter N=5;
 
   // IN
-  input [N-1:0] x;
-  input [N-1:0] y;
+  input [N-1:0] x;  //DIVIDEND
+  input [N-1:0] y;  //DIVISOR
   // OUT
-  output [N-1:0] z;
+  output [N-1:0] z;  //FINAL QUOTIENT
 
   wire [N-2:0] d;
 
   wire [1:0] rc[N-1:0][N-1:0]; //N iterations, N-1 bits wide numbers
   wire [1:0] rs[N-1:0];
   wire [1:0] r[N-1:0];
-  wire [1:0] radj[N-1:0];
+  wire [1:0] radj[N-1:0];  //FINAL REMINDER
 
   wire [1:0] sprop[N-1:0][N-1:0];
   wire [1:0] ssprop[N-1:0];
@@ -48,11 +48,7 @@ module intdiv_intdiv(x, y, z/*,r*/);
   wire [1:0] lastovf;
   wire lastovfs;
 
-  /* any row i includes:
-   * if first row: cmp, abs, neg, sgn, cmp
-   * if last one: sub, abs, adj
-   * if any other: sub, abs, neg, sgn, cmp
-   * 
+  /* 
    * Signals are numbered with the same indexes of the elemets that generate them
    * Indexes decrease from left to right
    * An input that comes to the cell from the same row but previous coloumn will be (i,j+1)
@@ -65,8 +61,6 @@ module intdiv_intdiv(x, y, z/*,r*/);
 
   for (i=N-1; i>=0; i=i-1) begin: row
 
-	//intdiv_abs ovf(1'b0, 1'b0, 2'b00, fakeovfout[i], sprop[i][N-1]); //tr[N-2], fakeovfout[i+1], rc[i+1][j-1]
-	//module intdiv_ovf(minm, minl, tr, res, sign_out, wrong);
 	if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 	else intdiv_ovf ovf(rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 
@@ -113,7 +107,6 @@ module intdiv_intdiv(x, y, z/*,r*/);
 
   for (j=N-1; j>=0; j=j-1) begin: mux
 	assign r[j] = seladj ? rc[0][j] : rs[j];
-	//module intdiv_sdcmp(op, res, enable);
 	intdiv_sdcmp negconv(r[j], radj[j], x[N-1]);	
   end
 

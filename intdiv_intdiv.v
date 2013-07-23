@@ -1,10 +1,14 @@
 `timescale 1ns / 1ps
 
+
 //sd2 encoding
 `define NEG1 2'b11
 `define ZERO 2'b00
 `define POS1_1 2'b01
 `define POS1_2 2'b10
+
+
+//`include "intdiv_sd2encoding.v"
 
 `define ON 1'b1
 `define OFF 1'b0
@@ -12,7 +16,7 @@
 `define NEGATIVE 1'b1
 `define POSITIVE 1'b0
 
-module intdiv_intdiv(x, y, z/*,r*/);
+module intdiv_intdiv(x, y, z, r);
 
   parameter N=5;
 
@@ -21,13 +25,16 @@ module intdiv_intdiv(x, y, z/*,r*/);
   input [N-1:0] y;  //DIVISOR
   // OUT
   output [N-1:0] z;  //FINAL QUOTIENT
+  output [N-1:0] r;  //FINAL REMINDER
 
   wire [N-2:0] d;
 
   wire [1:0] rc[N-1:0][N-1:0]; //N iterations, N-1 bits wide numbers
   wire [1:0] rs[N-1:0];
-  wire [1:0] r[N-1:0];
-  wire [1:0] radj[N-1:0];  //FINAL REMINDER
+  wire [1:0] rsd2[N-1:0];
+  wire [1:0] rsd2re[N-1:0];
+  wire [((N-1)*2)+1:0] rflat;
+  //wire [1:0] radj[N-1:0];  //FINAL REMINDER
 
   wire [1:0] sprop[N-1:0][N-1:0];
   wire [1:0] ssprop[N-1:0];
@@ -106,12 +113,22 @@ module intdiv_intdiv(x, y, z/*,r*/);
   end
 
   for (j=N-1; j>=0; j=j-1) begin: mux
-	assign r[j] = seladj ? rc[0][j] : rs[j];
-	intdiv_sdcmp negconv(r[j], radj[j], x[N-1]);	
+	assign rsd2[j] = seladj ? rc[0][j] : rs[j];
+	//intdiv_sdcmp negconv(r[j], radj[j], x[N-1]);	
   end
 
+  for (j=N-1; j>=0; j=j-1) begin: recode
+	intdiv_recode recode(rsd2[j], rsd2re[j]);
+  end
+
+  for (j=N-1; j>=0; j=j-1) begin: flatten
+	  assign rflat[j*2] = rsd2re[j][0];
+	  assign rflat[j*2+1] = rsd2re[j][1];
+  end
+  intdiv_negconv #(.WIDTH(N)) negconv(rflat, r, x[N-1]);	
+
   endgenerate
-  
+
   intdiv_padj #(.WIDTH(N-1)) 
 	padjuster (
 	.op(p[N-1:1]),
@@ -122,6 +139,26 @@ module intdiv_intdiv(x, y, z/*,r*/);
 
 endmodule
 
+module intdiv_recode(x, y);
+
+  // IN
+  input [1:0] x;
+  // OUT
+  output [1:0] y;
+
+  reg [1:0] y;
+  always @(x)
+  begin
+     case (x)
+	`NEG1: begin y <= 2'b01; end
+	`ZERO: begin y <= 2'b00; end
+	`POS1_1: begin y <= 2'b10; end
+	default: begin y <= 2'b10; end
+     endcase
+  end
+
+endmodule
+
 //test bench
 module intdiv_intdiv_tb();
 
@@ -129,12 +166,14 @@ module intdiv_intdiv_tb();
   reg [N-1:0] x_tb;
   reg [N-1:0] y_tb;
   wire [N-1:0] z_tb;
+  wire [N-1:0] r_tb;
 
   intdiv_intdiv #(.N(N)) 
 	intdiv (
 	.x(x_tb),
 	.y(y_tb),
-	.z(z_tb)
+	.z(z_tb),
+	.r(r_tb)
 	);
 
   initial

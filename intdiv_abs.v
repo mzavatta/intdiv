@@ -6,6 +6,8 @@
 `define POS1_1 2'b01
 `define POS1_2 2'b10
 
+//`include "intdiv_sd2encoding.v"
+
 module intdiv_abs(ps, tr, sign_in, res, sign_out);
   // IN
   input ps, tr; //standard binary

@@ -12,17 +12,21 @@
 */
 
 //sd2 encoding
-`define NEG1 2'b01
-`define ZERO1_1 2'b00
-`define ZERO1_2 2'b11
-`define POS1 2'b10
+`define NEG1_pn 2'b01
+`define ZERO_pn_1 2'b00
+`define ZERO_pn_2 2'b11
+`define POS1_pn 2'b10
 
+/* Works only with (p,n) SD2 encoding
+ * Input is N-bit SD2, output is N-bit 2C thus overflow might occur.
+ * Converts any SD2 integer into its 2C representation, taking the inverse if enabled
+ */
 module intdiv_negconv(op, res, enable);
 
   parameter WIDTH = 5;
 
   // IN
-  //input [1:0] op[WIDTH-1:0]; //WIDTH-wide SD2 number, (p,n)=p-n encoded
+  //input [1:0] op[WIDTH-1:0]; unfortunately illegal in Verilog (legal in SystemVerilog)
   input [((WIDTH-1)*2)+1:0] op; //WIDTH-wide SD2 number, (p,n)=p-n encoded
   input enable;
   // OUT
@@ -32,11 +36,10 @@ module intdiv_negconv(op, res, enable);
   wire [WIDTH-1:0] P;
   wire [WIDTH-1:0] N;
 
-  //assign opt = op;
-
   genvar j;
   generate
 
+  //essentially remap op into a vector signal. Vectors cannot be inputs or outputs in Verilog
   for (j=WIDTH-1; j>=0; j=j-1) begin: signal
   assign opt[j][0] = op[j*2];
   assign opt[j][1] = op[j*2+1];
@@ -53,14 +56,6 @@ module intdiv_negconv(op, res, enable);
 
   //result is subtraction of the two parts
   assign res = P-N;
-
-/*
-  reg [WIDTH-1:0] res;
-  always @(P or N)
-  begin
-	res <= P - N;
-  end
-*/
 
 endmodule
 
@@ -85,7 +80,37 @@ module intdiv_negconv_tb();
   
   initial
   begin
-	op_tb = {`ZERO1_1, `POS1, `NEG1, `ZERO1_1, `POS1};
+	op_tb = {`ZERO_pn_1, `POS1_pn, `NEG1_pn, `ZERO_pn_1, `POS1_pn};
+	enable_tb = `OFF;
+	#100;
+	enable_tb = `ON;
+	#100;
+	op_tb = {`POS1_pn, `POS1_pn, `POS1_pn, `ZERO_pn_1, `POS1_pn};
+	enable_tb = `OFF;
+	#100;
+	enable_tb = `ON;
+	#100;
+	op_tb = {`ZERO_pn_1, `ZERO_pn_1, `ZERO_pn_1, `ZERO_pn_1, `ZERO_pn_1};
+	enable_tb = `OFF;
+	#100;
+	enable_tb = `ON;
+	#100;
+	op_tb = {`POS1_pn, `ZERO_pn_1, `ZERO_pn_1, `ZERO_pn_1, `NEG1_pn};
+	enable_tb = `OFF;
+	#100;
+	enable_tb = `ON;
+	#100;
+	op_tb = {`ZERO_pn_1, `NEG1_pn, `ZERO_pn_1, `POS1_pn, `NEG1_pn};
+	enable_tb = `OFF;
+	#100;
+	enable_tb = `ON;
+	#100;
+	op_tb = {`ZERO_pn_1, `NEG1_pn, `ZERO_pn_1, `POS1_pn, `NEG1_pn};
+	enable_tb = `OFF;
+	#100;
+	enable_tb = `ON;
+	#100;
+	op_tb = {`NEG1_pn, `ZERO_pn_1, `ZERO_pn_1, `ZERO_pn_1, `ZERO_pn_1};
 	enable_tb = `OFF;
 	#100;
 	enable_tb = `ON;

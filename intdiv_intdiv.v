@@ -1,14 +1,14 @@
 `timescale 1ns / 1ps
 
-
+/*
 //sd2 encoding
 `define NEG1 2'b11
 `define ZERO 2'b00
 `define POS1_1 2'b01
 `define POS1_2 2'b10
+*/
 
-
-//`include "intdiv_sd2encoding.v"
+`include "intdiv_sd2encoding.v"
 
 `define ON 1'b1
 `define OFF 1'b0
@@ -34,14 +34,13 @@ module intdiv_intdiv(x, y, z, r);
   wire [1:0] rsd2[N-1:0];
   wire [1:0] rsd2re[N-1:0];
   wire [((N-1)*2)+1:0] rflat;
-  //wire [1:0] radj[N-1:0];  //FINAL REMINDER
 
   wire [1:0] sprop[N-1:0][N-1:0];
   wire [1:0] ssprop[N-1:0];
   wire ps[N-1:0][N-2:0];
   wire tr[N-1:0][N-2:0];
-  wire psl[N-2:0];
-  wire trl[N-2:0];
+  wire psl[N-1:0];
+  wire trl[N-1:0];
 
   wire [1:0] xneg[N-2:0];
   wire [N-1:0] p;
@@ -50,10 +49,8 @@ module intdiv_intdiv(x, y, z, r);
 
   wire padj, seladj;
 
-  wire [1:0] fakeovfout[N-1:0];
   wire wrong[N-1:0];
   wire [1:0] lastovf;
-  wire lastovfs;
 
   /* 
    * Signals are numbered with the same indexes of the elemets that generate them
@@ -75,7 +72,7 @@ module intdiv_intdiv(x, y, z, r);
 		if (i==N-1) intdiv_sgn sgn(sprop[i][0], x[i], sign[i]);
 		else intdiv_sgn sgn(sprop[i][0], sign[i+1], sign[i]);
 		intdiv_neg neg(x[i-1], sign[i], xneg[i-1]);
-		xnor cmpp(p[i], sign[i], y[N-1]); //positive numbers version working with xnor
+		xnor cmpp(p[i], sign[i], y[N-1]);
 	end
 	else intdiv_adj adj(x[N-1], y[N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
 
@@ -83,7 +80,7 @@ module intdiv_intdiv(x, y, z, r);
 		if (i==N-1) begin //upper row
 			xor cmpy(d[j], y[N-1], y[j]);
 			if (j==0) begin
-				intdiv_sub sub(d[j], {1'b0, x[N-1]}, ps[i][j], tr[i][j]);
+				intdiv_sub sub(d[j], {x[N-1], 1'b0}, ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], y[N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost
 			end
 			else begin
@@ -104,30 +101,41 @@ module intdiv_intdiv(x, y, z, r);
 	end
   end
 
-  assign lastovf = rc[0][N-1];
+  //assign lastovf = rc[0][N-1];
   for (j=N-1; j>=0; j=j-1) begin: star
 	if (j<N-1) intdiv_sub sub(d[j], rc[0][j], psl[j], trl[j]);
-	if (j==N-1) intdiv_abs abs(lastovf[0], trl[j-1], 2'b00, rs[j], ssprop[j]);
+	else intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
+	if (j==N-1) intdiv_abs abs(psl[j], trl[j-1], 2'b00, rs[j], ssprop[j]);
 	else if (j==0) intdiv_abs abs(psl[j], y[N-1], ssprop[j+1], rs[j], ssprop[j]);
 	else intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
   end
 
-  for (j=N-1; j>=0; j=j-1) begin: mux
+  for (j=N-1; j>=0; j=j-1) begin: select
 	assign rsd2[j] = seladj ? rc[0][j] : rs[j];
-	//intdiv_sdcmp negconv(r[j], radj[j], x[N-1]);	
   end
 
+  /*
   for (j=N-1; j>=0; j=j-1) begin: recode
 	intdiv_recode recode(rsd2[j], rsd2re[j]);
   end
+  */
+
+  /*
+  for (j=N-1; j>=0; j=j-1) begin: flatten
+	assign rflat[j*2] = rsd2re[j][0];
+	assign rflat[j*2+1] = rsd2re[j][1];
+  end
+  */
 
   for (j=N-1; j>=0; j=j-1) begin: flatten
-	  assign rflat[j*2] = rsd2re[j][0];
-	  assign rflat[j*2+1] = rsd2re[j][1];
+	assign rflat[j*2] = rsd2[j][0];
+	assign rflat[j*2+1] = rsd2[j][1];
   end
-  intdiv_negconv #(.WIDTH(N)) negconv(rflat, r, x[N-1]);	
+
 
   endgenerate
+
+  intdiv_negconv #(.WIDTH(N)) negconv(rflat, r, x[N-1]);	
 
   intdiv_padj #(.WIDTH(N-1)) 
 	padjuster (
@@ -139,6 +147,7 @@ module intdiv_intdiv(x, y, z, r);
 
 endmodule
 
+/*
 module intdiv_recode(x, y);
 
   // IN
@@ -158,6 +167,7 @@ module intdiv_recode(x, y);
   end
 
 endmodule
+*/
 
 //test bench
 module intdiv_intdiv_tb();
@@ -249,6 +259,9 @@ module intdiv_intdiv_tb();
   #100;
   x_tb = 5'b10101;
   y_tb = 5'b10001;
+  #100;
+  x_tb = 5'd5;
+  y_tb = 5'd3;
   #100;
   $stop;
   end

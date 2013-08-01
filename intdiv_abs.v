@@ -1,12 +1,14 @@
 `timescale 1ns / 1ps
 
+/*
 //sd2 encoding
 `define NEG1 2'b11
 `define ZERO 2'b00
 `define POS1_1 2'b01
 `define POS1_2 2'b10
+*/
 
-//`include "intdiv_sd2encoding.v"
+`include "intdiv_sd2encoding.v"
 
 module intdiv_abs(ps, tr, sign_in, res, sign_out);
   // IN
@@ -16,16 +18,81 @@ module intdiv_abs(ps, tr, sign_in, res, sign_out);
   output [1:0] res;  //sd2
   output [1:0] sign_out;  //sd2
 
+  wire ps, tr;
+  wire [1:0] sign_in;
   reg [1:0] res;
   reg [1:0] sign_out;
-  wire [1:0] sign_in;
-  wire ps, tr;
 
   wire [1:0] int; //sd2 encoded, intermediate sum to be inverted if sign_in is negative
+
+  // TABLE II.b Takagi et al. is simple concatenation if (p,n)=p-n encoding is used
+  // though specifying it this way makes it encoding-dependent
+  assign int = {ps, tr};
+
+  // Absolute value and sign detection/propagation
+  always @(int or sign_in)
+  begin
+  case ({sign_in, int})
+	{`NEG1, `NEG1}:	begin
+			res <= `POS1;
+			sign_out <= sign_in;
+			end
+	{`NEG1, `ZERO_1}: begin
+			res <= `ZERO_1;
+			sign_out <= sign_in;
+			end
+	{`NEG1, `ZERO_2}: begin
+			res <= `ZERO_1;
+			sign_out <= sign_in;
+			end
+	{`NEG1, `POS1}: begin
+			res <= `NEG1;
+			sign_out <= sign_in;
+			end
+	{`ZERO_1, `NEG1}: begin
+			res <= `POS1;
+			sign_out <= `NEG1;
+			end
+	{`ZERO_2, `NEG1}: begin
+			res <= `POS1;
+			sign_out <= `NEG1;
+			end
+	{`ZERO_1, `POS1}: begin
+			res <= `POS1;
+			sign_out <= `POS1;
+			end
+	{`ZERO_2, `POS1}: begin
+			res <= `POS1;
+			sign_out <= `POS1;
+			end
+	{`POS1, `NEG1}: begin
+			res <= `NEG1;
+			sign_out <= sign_in;
+			end
+	{`POS1, `ZERO_1}: begin
+			res <= `ZERO_1;
+			sign_out <= sign_in;
+			end
+	{`POS1, `ZERO_2}: begin
+			res <= `ZERO_1;
+			sign_out <= sign_in;
+			end
+	{`POS1, `POS1}: begin
+			res <= `POS1;
+			sign_out <= sign_in;
+			end
+	default: begin
+		  res <= `ZERO_1;
+		  sign_out <= `ZERO_1;
+		  end
+  endcase
+  end  
+
+  /*
   // TABLE II.b Takagi et al.
   assign int[1] = ~ps & tr;
   assign int[0] = (~ps & tr) | (ps & ~tr);
-  /* ..using a procedural block..
+  ..using a procedural block..
   always @(ps or tr)
   begin
 	if (ps==1'b0 && tr==1'b1)
@@ -37,6 +104,7 @@ module intdiv_abs(ps, tr, sign_in, res, sign_out);
   end
   */
 
+  /*
   always @(int or sign_in)
   begin
   case ({sign_in, int})
@@ -109,7 +177,8 @@ module intdiv_abs(ps, tr, sign_in, res, sign_out);
 		  sign_out <= sign_in;
 		  end
   endcase
-  end  
+  end
+  */
 endmodule
 
 //test bench
@@ -132,7 +201,7 @@ module intdiv_abs_tb();
   initial
   begin
 	{ps_tb, tr_tb} = 2'b00;
-	sign_in_tb = `ZERO;
+	sign_in_tb = `ZERO_1;
         for(i = 0; i < 4; i = i+1)
         begin
 		for(j = 0; j < 4; j = j+1)

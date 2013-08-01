@@ -1,10 +1,14 @@
 `timescale 1ns / 1ps
 
+/*
 //sd2 encoding
 `define NEG1 2'b11
 `define ZERO 2'b00
 `define POS1_1 2'b01
 `define POS1_2 2'b10
+*/
+
+`include "intdiv_sd2encoding.v"
 
 module intdiv_ovf(minm, minl, tr, res, sign_out, wrong);
   // IN
@@ -41,12 +45,82 @@ module intdiv_ovf(minm, minl, tr, res, sign_out, wrong);
 	.tr(trl)
 	);
 
+  /*
   // TABLE II.b Takagi et al.
   assign flag[1] = ~psm & trl;
   assign flag[0] = (~psm & trl) | (psm & ~trl);
   assign int[1] = ~psl & tr;
   assign int[0] = (~psl & tr) | (psl & ~tr);
+  */
 
+  // TABLE II.b Takagi et al. with (p,n) encoding
+  assign flag = {psm, trl};
+  assign int = {psl, tr};
+
+
+  always @(int or flag)
+  begin
+  case ({flag, int})
+	{`NEG1, `POS1}: begin
+			res <= `POS1;
+			sign_out <= `NEG1;
+		  	wrong <= 1'b0;
+			end//1
+	{`ZERO_1, `NEG1}: begin
+			res <= `POS1;
+			sign_out <= `NEG1;
+		  	wrong <= 1'b0;
+			end//3
+	{`ZERO_2, `NEG1}: begin
+			res <= `POS1;
+			sign_out <= `NEG1;
+		  	wrong <= 1'b0;
+			end//3
+	{`ZERO_1, `ZERO_1}: begin
+			res <= `ZERO_1;
+			sign_out <= `ZERO_1;
+		  	wrong <= 1'b0;
+			end//4
+	{`ZERO_1, `ZERO_2}: begin
+			res <= `ZERO_1;
+			sign_out <= `ZERO_1;
+		  	wrong <= 1'b0;
+			end//4
+	{`ZERO_2, `ZERO_1}: begin
+			res <= `ZERO_1;
+			sign_out <= `ZERO_1;
+		  	wrong <= 1'b0;
+			end//4
+	{`ZERO_2, `ZERO_2}: begin
+			res <= `ZERO_1;
+			sign_out <= `ZERO_1;
+		  	wrong <= 1'b0;
+			end//4
+	{`ZERO_1, `POS1}: begin
+			res <= `POS1;
+			sign_out <= `POS1;
+		  	wrong <= 1'b0;
+			end//5
+	{`ZERO_2, `POS1}: begin
+			res <= `POS1;
+			sign_out <= `POS1;
+		  	wrong <= 1'b0;
+			end//5
+	{`POS1, `NEG1}: begin
+			res <= `POS1;
+			sign_out <= `POS1;
+		  	wrong <= 1'b0;
+			end//7
+	default: begin
+		  res <= `ZERO_1;
+		  sign_out <= `ZERO_1;
+		  wrong <= 1'b1;
+		  end
+  endcase
+  end
+
+
+  /*
   always @(int or flag)
   begin
   case ({flag, int})
@@ -97,81 +171,6 @@ module intdiv_ovf(minm, minl, tr, res, sign_out, wrong);
 		  end
   endcase
   end
-
-  /*
-  always @(int or flag)
-  begin
-  case ({flag, int})
-	{`NEG1, `NEG1}:	begin
-			res <= `POS1_1;
-			sign_out <= sign_in;
-			end//1
-	{`NEG1, `ZERO}: begin
-			res <= `ZERO;
-			sign_out <= sign_in;
-			end//2
-	{`NEG1, `POS1_1}: begin
-			res <= `NEG1;
-			sign_out <= sign_in;
-			end//3
-	{`NEG1, `POS1_2}: begin
-			res <= `NEG1;
-			sign_out <= sign_in;
-			end//4
-	{`ZERO, `NEG1}: begin
-			res <= `POS1_1;
-			sign_out <= `NEG1;
-			end//5
-	{`ZERO, `ZERO}: begin
-			res <= `ZERO;
-			sign_out <= `ZERO;
-			end//6
-	{`ZERO, `POS1_1}: begin
-			res <= `POS1_1;
-			sign_out <= `POS1_1;
-			end//7
-	{`ZERO, `POS1_2}: begin
-			res <= `POS1_1;
-			sign_out <= `POS1_1;
-			end//8
-	{`POS1_1, `NEG1}: begin
-			res <= `NEG1;
-			sign_out <= sign_in;
-			end//9
-	{`POS1_2, `NEG1}: begin
-			res <= `NEG1;
-			sign_out <= sign_in;
-			end//10
-	{`POS1_1, `ZERO}: begin
-			res <= `ZERO;
-			sign_out <= sign_in;
-			end//11
-	{`POS1_2, `ZERO}: begin
-			res <= `ZERO;
-			sign_out <= sign_in;
-			end//12
-	{`POS1_1, `POS1_1}: begin
-			res <= `POS1_1;
-			sign_out <= sign_in;
-			end//13
-	{`POS1_1, `POS1_2}: begin
-			res <= `POS1_1;
-			sign_out <= sign_in;
-			end//14
-	{`POS1_2, `POS1_1}: begin
-			res <= `POS1_1;
-			sign_out <= sign_in;
-			end//15
-	{`POS1_2, `POS1_2}: begin
-			res <= `POS1_1;
-			sign_out <= sign_in;
-			end//16
-	default: begin
-		  res <= `ZERO;
-		  sign_out <= sign_in;
-		  end
-  endcase
-  end  
   */
 
 endmodule
@@ -200,11 +199,11 @@ module intdiv_ovf_tb();
   initial
   begin
 	tr_tb = 1'b0;
-	minm_tb = `ZERO;
-	minl_tb = `ZERO;
+	minm_tb = `ZERO_1;
+	minl_tb = `ZERO_1;
 	#100;
 	tr_tb = 1'b1;
-	minm_tb = `POS1_1;
+	minm_tb = `POS1;
 	#100;
 	tr_tb = 1'b0;
 	#100;

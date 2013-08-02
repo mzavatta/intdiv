@@ -101,7 +101,6 @@ module intdiv_intdiv(x, y, z, r);
 	end
   end
 
-  //assign lastovf = rc[0][N-1];
   for (j=N-1; j>=0; j=j-1) begin: star
 	if (j<N-1) intdiv_sub sub(d[j], rc[0][j], psl[j], trl[j]);
 	else intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
@@ -113,19 +112,6 @@ module intdiv_intdiv(x, y, z, r);
   for (j=N-1; j>=0; j=j-1) begin: select
 	assign rsd2[j] = seladj ? rc[0][j] : rs[j];
   end
-
-  /*
-  for (j=N-1; j>=0; j=j-1) begin: recode
-	intdiv_recode recode(rsd2[j], rsd2re[j]);
-  end
-  */
-
-  /*
-  for (j=N-1; j>=0; j=j-1) begin: flatten
-	assign rflat[j*2] = rsd2re[j][0];
-	assign rflat[j*2+1] = rsd2re[j][1];
-  end
-  */
 
   for (j=N-1; j>=0; j=j-1) begin: flatten
 	assign rflat[j*2] = rsd2[j][0];
@@ -147,36 +133,16 @@ module intdiv_intdiv(x, y, z, r);
 
 endmodule
 
-/*
-module intdiv_recode(x, y);
-
-  // IN
-  input [1:0] x;
-  // OUT
-  output [1:0] y;
-
-  reg [1:0] y;
-  always @(x)
-  begin
-     case (x)
-	`NEG1: begin y <= 2'b01; end
-	`ZERO: begin y <= 2'b00; end
-	`POS1_1: begin y <= 2'b10; end
-	default: begin y <= 2'b10; end
-     endcase
-  end
-
-endmodule
-*/
-
 //test bench
 module intdiv_intdiv_tb();
 
   parameter N = 5;
+
   reg signed [N-1:0] x_tb;
   reg signed [N-1:0] y_tb;
   wire signed [N-1:0] z_tb;
   wire signed [N-1:0] r_tb;
+
   reg signed [N-1:0] z_exp;
   reg signed [N-1:0] r_exp;
   reg alarm;

@@ -18,7 +18,7 @@
 
 module intdiv_intdiv(x, y, z, r);
 
-  parameter N=5;
+  parameter N=32;
 
   // IN
   input [N-1:0] x;  //DIVIDEND
@@ -136,7 +136,7 @@ endmodule
 //test bench
 module intdiv_intdiv_tb();
 
-  parameter N = 5;
+  parameter N = 32;
 
   reg signed [N-1:0] x_tb;
   reg signed [N-1:0] y_tb;

@@ -173,10 +173,13 @@ endmodule
 module intdiv_intdiv_tb();
 
   parameter N = 5;
-  reg [N-1:0] x_tb;
-  reg [N-1:0] y_tb;
-  wire [N-1:0] z_tb;
-  wire [N-1:0] r_tb;
+  reg signed [N-1:0] x_tb;
+  reg signed [N-1:0] y_tb;
+  wire signed [N-1:0] z_tb;
+  wire signed [N-1:0] r_tb;
+  reg signed [N-1:0] z_exp;
+  reg signed [N-1:0] r_exp;
+  reg alarm;
 
   intdiv_intdiv #(.N(N)) 
 	intdiv (
@@ -186,83 +189,28 @@ module intdiv_intdiv_tb();
 	.r(r_tb)
 	);
 
+  integer i, j;
+
   initial
   begin
-  x_tb = 5'b00111;
-  y_tb = 5'b00011;
-  #100;
-  x_tb = 5'b00111;
-  y_tb = 5'b00010;
-  #100;
-  x_tb = 5'b01000;
-  y_tb = 5'b00010;
-  #100;
-  x_tb = 5'b00111;
-  y_tb = 5'b00001;
-  #100;
-  x_tb = 5'b00111;
-  y_tb = 5'b00001;
-  #100;
-  x_tb = 5'b01110;
-  y_tb = 5'b00101;
-  #100;
-  x_tb = 5'b01110;
-  y_tb = 5'b01001;
-  #100;
-  x_tb = 5'b01010;
-  y_tb = 5'b00111;
-  #100;
-  x_tb = 5'b01100;
-  y_tb = 5'b00011;
-  #100;
-  x_tb = 5'b00011;
-  y_tb = 5'b01110;
-  #100;
-  x_tb = 5'b00100;
-  y_tb = 5'b01010;
-  #100;
-  x_tb = 5'b00110;
-  y_tb = 5'b01111;
-  #100;
-  x_tb = 5'b01111;
-  y_tb = 5'b01111;
-  #100;
-  x_tb = 5'b00000;
-  y_tb = 5'b01111;
-  #100;
-  x_tb = 5'b01111;
-  y_tb = 5'b00000;
-  #100;
-  x_tb = 5'b11011;
-  y_tb = 5'b00011;
-  #100;
-  x_tb = 5'b11001;
-  y_tb = 5'b00011;
-  #100;
-  x_tb = 5'b10001;
-  y_tb = 5'b01111;
-  #100;
-  x_tb = 5'b11001;
-  y_tb = 5'b11100;
-  #100;
-  x_tb = 5'b11111;
-  y_tb = 5'b00001;
-  #100;
-  x_tb = 5'b00001;
-  y_tb = 5'b11111;
-  #100;
-  x_tb = 5'b00001;
-  y_tb = 5'b10001;
-  #100;
-  x_tb = 5'b00101;
-  y_tb = 5'b10001;
-  #100;
-  x_tb = 5'b10101;
-  y_tb = 5'b10001;
-  #100;
-  x_tb = 5'd5;
-  y_tb = 5'd3;
-  #100;
+  alarm = 1'b0;
+  x_tb = 5'd0;
+  y_tb = 5'd0;
+  for (i=0; i<(2**N); i=i+1) begin
+	alarm = 1'b0;
+	x_tb = i;
+	for (j=1; j<(2**N); j=j+1) begin //excludes division by zero
+		y_tb = j;
+		#10;
+		z_exp = x_tb/y_tb;
+		r_exp = x_tb%y_tb;
+	  	if (z_tb != z_exp || r_tb != r_exp) begin
+			$display ("Error: expected values z=%d r=%d, got values %d %d", z_exp, r_exp, z_tb, r_tb);
+			alarm = 1'b1;
+		end
+	  	#100;
+	end
+  end
   $stop;
   end
 

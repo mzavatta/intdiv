@@ -38,7 +38,7 @@ module intdiv_sub(sub, min, sum, tr);
         default: 	 begin {tr, sum} <= 2'b00; end
   endcase
   end
-  */
+  */  
 
   /* assuming original encoding
   // TABLE II.a Takagi et al.

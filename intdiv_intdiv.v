@@ -159,6 +159,8 @@ module intdiv_intdiv_tb();
 
   initial
   begin
+  /*
+  //automated exhaustive self-checking
   alarm = 1'b0;
   x_tb = 5'd0;
   y_tb = 5'd0;
@@ -177,6 +179,13 @@ module intdiv_intdiv_tb();
 	  	#100;
 	end
   end
+  */
+  x_tb = 5'd30;
+  y_tb = 5'd7;
+  #100;
+  x_tb = -5'd120;
+  y_tb = 5'd11;
+  #100;
   $stop;
   end
 

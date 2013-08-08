@@ -18,7 +18,7 @@
 
 module intdiv_intdiv(x, y, z, r);
 
-  parameter N=32;
+  parameter N=64;
 
   // IN
   input [N-1:0] x;  //DIVIDEND

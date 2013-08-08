@@ -9,3 +9,4 @@
 `define ZERO_1 2'b00
 `define ZERO_2 2'b11
 `define POS1 2'b10
+`define DONTCARES 2'bxx

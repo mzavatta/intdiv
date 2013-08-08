@@ -82,8 +82,8 @@ module intdiv_abs(ps, tr, sign_in, res, sign_out);
 			sign_out <= sign_in;
 			end
 	default: begin
-		  res <= `ZERO_1;
-		  sign_out <= `ZERO_1;
+		  res <= `DONTCARES;
+		  sign_out <= `DONTCARES;
 		  end
   endcase
   end  

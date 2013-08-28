@@ -21,7 +21,7 @@
 
 module intdiv_intdiv(clock, x, y, reg_z, reg_r);
 
-  parameter N=8;
+  parameter N=4;
   parameter STAGES=3;	//pipeline stages
   parameter STAGESBODY=STAGES-1; //need one last negconv-padjust stage
   parameter STEPS=N/STAGESBODY;
@@ -220,10 +220,8 @@ module intdiv_intdiv(clock, x, y, reg_z, reg_r);
 
 	//compose outputs in their register
 	reg_z[0] <= seladj;
-	reg_z[N-1:1] = z[N-1:1];
+	reg_z[N-1:1] <= z[N-1:1];
 	reg_r <= r;
-
-
 
 	for (pp=0; pp<STAGESBODY; pp=pp+1)
 	begin
@@ -256,7 +254,9 @@ endmodule
 //test bench
 module intdiv_intdiv_tb();
 
-  parameter N = 32;
+  parameter N = 4;
+
+  parameter PERIOD = 10;
 
   reg signed [N-1:0] x_tb;
   reg signed [N-1:0] y_tb;
@@ -267,15 +267,29 @@ module intdiv_intdiv_tb();
   reg signed [N-1:0] r_exp;
   reg alarm;
 
+  reg CLKtb;
+
   intdiv_intdiv #(.N(N)) 
 	intdiv (
 	.x(x_tb),
 	.y(y_tb),
 	.reg_z(z_tb),
-	.reg_r(r_tb)
+	.reg_r(r_tb),
+	.clock(CLKtb)
 	);
 
   integer i, j;
+
+
+
+  always
+  begin
+	CLKtb=0;
+	#(PERIOD/2);
+	CLKtb=1;
+	#(PERIOD/2);
+  end
+
 
   initial
   begin
@@ -300,8 +314,16 @@ module intdiv_intdiv_tb();
 	end
   end
   */
+  /*
   x_tb = 5'd30;
   y_tb = 5'd7;
+  #100;
+  x_tb = -5'd120;
+  y_tb = 5'd11;
+  #100;
+  */
+  x_tb = 5'd7;
+  y_tb = 5'd3;
   #100;
   x_tb = -5'd120;
   y_tb = 5'd11;

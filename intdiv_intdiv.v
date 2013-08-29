@@ -168,10 +168,10 @@ module intdiv_intdiv(clock, x, y, reg_z, reg_r);
   end
 
   for (j=N-1; j>=0; j=j-1) begin: star
-	if (j<N-1) intdiv_sub sub(d[0][j], rc[0][j], psl[j], trl[j]);
+	if (j<N-1) intdiv_sub sub(d[1][j], rc[0][j], psl[j], trl[j]);
 	else intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
 	if (j==N-1) intdiv_abs abs(psl[j], trl[j-1], 2'b00, rs[j], ssprop[j]);
-	else if (j==0) intdiv_abs abs(psl[j], reg_y[0][N-1], ssprop[j+1], rs[j], ssprop[j]);
+	else if (j==0) intdiv_abs abs(psl[j], reg_y[1][N-1], ssprop[j+1], rs[j], ssprop[j]);
 	else intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
   end
 
@@ -229,11 +229,14 @@ module intdiv_intdiv(clock, x, y, reg_z, reg_r);
 		for(cc=N; cc>0; cc=cc-1) begin
 			reg_rc[pp][cc] <= rc[pp*STEPS][cc-1];
 		end
-		reg_rc[pp][0] <= xneg[pp*STEPS];
+		if(pp!=0) reg_rc[pp][0] <= xneg[pp*STEPS-1];
 
 		//store sign chain
 		reg_sign[pp] <= sign[pp*STEPS];
+	end
 
+	for (pp=STAGESBODY-1; pp>=0; pp=pp-1)
+	begin
 		//store quotient digits
 		//reg_p[pp][((pp+1)*STEPS)-1:pp*STEPS] <= p[((pp+1)*STEPS)-1:pp*STEPS];
 		reg_p[pp][pp*STEPS+:STEPS] <= p[pp*STEPS+:STEPS];
@@ -243,8 +246,20 @@ module intdiv_intdiv(clock, x, y, reg_z, reg_r);
 	for (pp=0; pp<STAGESBODY-1; pp=pp+1)
 	begin
 		//reg_p[pp][N-1+:N-(STAGES-pp-1)*STEPS] <= reg_p[pp+1][N-1+:N-(STAGES-pp-1)*STEPS];
-		for(ss=STAGESBODY-1-pp; ss>=0; ss=ss-1) begin
+		for(ss=STAGESBODY-1; ss>=0; ss=ss-1) begin
 		reg_p[pp][ss*STEPS+:STEPS] <= reg_p[pp+1][ss*STEPS+:STEPS];
+		end
+	end
+
+	//propagate partial quotients
+	for (pp=0; pp<STAGESBODY-1; pp=pp+1)
+	begin
+		//reg_p[pp][N-1+:N-(STAGES-pp-1)*STEPS] <= reg_p[pp+1][N-1+:N-(STAGES-pp-1)*STEPS];
+		//for(ss=0; ss<STAGESBODY-1; ss=ss+1) begin
+		//reg_p[pp][ss*STEPS+:STEPS] <= reg_p[pp+1][ss*STEPS+:STEPS];
+		//end
+		for (ss=0; ss<STAGESBODY-1-pp; ss=ss+1) begin
+		reg_p[pp][(N-1)-ss*STEPS-:STEPS] <= reg_p[pp+1][(N-1)-ss*STEPS-:STEPS];
 		end
 	end
   end
@@ -256,7 +271,7 @@ module intdiv_intdiv_tb();
 
   parameter N = 4;
 
-  parameter PERIOD = 10;
+  parameter PERIOD = 100;
 
   reg signed [N-1:0] x_tb;
   reg signed [N-1:0] y_tb;
@@ -324,10 +339,10 @@ module intdiv_intdiv_tb();
   */
   x_tb = 5'd7;
   y_tb = 5'd3;
-  #100;
+  #1000;
   x_tb = -5'd120;
   y_tb = 5'd11;
-  #100;
+  #1000;
   $stop;
   end
 

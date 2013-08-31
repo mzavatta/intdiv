@@ -21,9 +21,11 @@
 
 module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
-  parameter N=6;
-  parameter STAGES=3;	//pipeline stages
-  parameter STAGESBODY=STAGES-1; //need one last negconv-padjust stage
+  parameter N=4;
+  parameter STAGESTOTAL=6;  //pipeline stages
+  parameter STAGES=STAGESTOTAL-1; //length of input chain, from the total exclude output stage
+  parameter STAGESBODY=STAGES-1; //division of the circuit body, excludes input and output stage
+  //output stage is padjust, negconv stage
   parameter STEPS=N/STAGESBODY;
 
   // IN
@@ -105,7 +107,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   for (i=N-1; i>=0; i=i-1) begin: row
 
 	if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[STAGES-1][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
-	else if (`BOUND==0) intdiv_ovf ovf(reg_rc[(i/STEPS)+1][N], reg_rc[`STG][N-1], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
+	else if (`BOUND==0) intdiv_ovf ovf(reg_rc[`STG][N], reg_rc[`STG][N-1], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 	else intdiv_ovf ovf(rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 
 	if (i!=0) begin
@@ -125,14 +127,17 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		   xnor cmpp(p[i], sign[i], reg_y[`STG][N-1]);
 		end
 	end
-	else intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
+	else begin
+		if (`BOUND==0) intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], reg_sign[`STG], sprop[i][0], ssprop[0], padj, seladj);
+		else intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
+	end
 
 	for (j=N-2; j>=0; j=j-1) begin: col
 		if (i==N-1) begin //upper row
 			xor cmpy(d[`STG][j], reg_y[`STG][N-1], reg_y[`STG][j]);
 			if (j==0) begin
 				intdiv_sub sub(d[`STG][j], {reg_x[`STG][N-1], 1'b0}, ps[i][j], tr[i][j]);
-				intdiv_abs abs(ps[i][j], y[N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost
+				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost
 			end
 			else begin
 				intdiv_sub sub(d[`STG][j], 2'b00, ps[i][j], tr[i][j]);
@@ -290,17 +295,19 @@ endmodule
 //test bench
 module intdiv_intdiv_tb();
 
-  parameter N = 6;
+  parameter N = 4;
 
   parameter PERIOD = 1000;
+
+  parameter STAGESTOTAL = 6;
 
   reg signed [N-1:0] x_tb;
   reg signed [N-1:0] y_tb;
   wire signed [N-1:0] z_tb;
   wire signed [N-1:0] r_tb;
 
-  reg signed [N-1:0] z_exp;
-  reg signed [N-1:0] r_exp;
+  reg signed [N-1:0] z_exp[STAGESTOTAL-1:0];
+  reg signed [N-1:0] r_exp[STAGESTOTAL-1:0];
   reg alarm;
 
   reg CLKtb;
@@ -317,9 +324,15 @@ module intdiv_intdiv_tb();
 	.clock(CLKtb)
 	);
 
-  integer i, j;
+  integer i, j, k;
 
 
+  initial
+  begin
+	i=0;
+	j=1;
+	reset_tb=0;
+  end
 
   always
   begin
@@ -329,9 +342,46 @@ module intdiv_intdiv_tb();
 	#(PERIOD/2);
   end
 
+  always@(negedge CLKtb)
+  begin
+	/*for (k=0; k<STAGESTOTAL-1; k=k+1) begin
+		x_tb[k+1] <= x_tb[k];
+		y_tb[k+1] <= y_tb[k]; 
+	end*/
+	for (k=0; k<STAGESTOTAL-1; k=k+1) begin
+		z_exp[k+1] <= z_exp[k];
+		r_exp[k+1] <= r_exp[k];
+	end
+	if (i<(2**N)) begin
+		x_tb = i;
+		if (j<(2**N)) begin
+			y_tb = j;
+			z_exp[0] = x_tb/y_tb;
+			r_exp[0] = x_tb%y_tb;
+			j=j+1;			
+		end
+		else begin
+			j=1;
+			i=i+1;
+		end
+	end
+	else $stop;
+  end
 
+  always@(negedge CLKtb)
+  begin
+	if (z_tb != z_exp[STAGESTOTAL-1] || r_tb != r_exp[STAGESTOTAL-1]) begin
+	   $display ("Error: expected values z=%d r=%d, got values %d %d", z_exp[STAGESTOTAL-1], r_exp[STAGESTOTAL-1], z_tb, r_tb);
+	   alarm = 1'b1;
+	end
+	else alarm = 1'b0;
+  end
+
+  /*
   initial
   begin
+  */
+  
   /*
   //automated exhaustive self-checking
   alarm = 1'b0;
@@ -361,6 +411,8 @@ module intdiv_intdiv_tb();
   y_tb = 5'd11;
   #100;
   */
+
+  /*
   reset_tb = 1;
   #2000;
   reset_tb = 0;
@@ -378,5 +430,6 @@ module intdiv_intdiv_tb();
   #10000;
   $stop;
   end
+  */
 
 endmodule

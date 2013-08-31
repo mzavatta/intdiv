@@ -19,9 +19,9 @@
 `define BOUND (i+1)%STEPS
 `define STG (i/STEPS)+1
 
-module intdiv_intdiv(clock, x, y, reg_z, reg_r);
+module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
-  parameter N=4;
+  parameter N=6;
   parameter STAGES=3;	//pipeline stages
   parameter STAGESBODY=STAGES-1; //need one last negconv-padjust stage
   parameter STEPS=N/STAGESBODY;
@@ -30,6 +30,7 @@ module intdiv_intdiv(clock, x, y, reg_z, reg_r);
   input [N-1:0] x;  //DIVIDEND
   input [N-1:0] y;  //DIVISOR
   input clock;
+  input reset;
   // OUT
   output [N-1:0] reg_z;  //FINAL QUOTIENT
   output [N-1:0] reg_r;  //FINAL REMINDER
@@ -62,7 +63,7 @@ module intdiv_intdiv(clock, x, y, reg_z, reg_r);
   //reg [N-2:0] reg_d[S-1:0];
 
   //to hold sign outputs
-  reg reg_sign[STAGESBODY-1:0];
+  reg [STAGESBODY-1:0] reg_sign;
 
   //to hold adj cell output
   reg reg_padj;
@@ -202,6 +203,21 @@ module intdiv_intdiv(clock, x, y, reg_z, reg_r);
   always @(posedge clock)
   begin
 
+  if (reset==1'b1) begin
+	for (pp=0; pp<=STAGES-1; pp=pp+1)
+        begin
+	reg_y[pp] <= 0;
+	reg_x[pp] <= 0;
+	end
+	for (pp=0; pp<=STAGESBODY-1; pp=pp+1)
+	begin
+		for (cc=0; cc<=N; cc=cc+1) begin 
+			reg_rc[pp][cc] <= 0;
+		end
+		reg_sign[pp] <= 0;
+	end
+  end
+  else begin
 	//load and propagate inputs
 	reg_y[STAGES-1] <= y;
 	reg_x[STAGES-1] <= x;
@@ -263,15 +279,16 @@ module intdiv_intdiv(clock, x, y, reg_z, reg_r);
 		end
 	end
   end
+  end
 
 endmodule
 
 //test bench
 module intdiv_intdiv_tb();
 
-  parameter N = 4;
+  parameter N = 6;
 
-  parameter PERIOD = 100;
+  parameter PERIOD = 1000;
 
   reg signed [N-1:0] x_tb;
   reg signed [N-1:0] y_tb;
@@ -284,12 +301,15 @@ module intdiv_intdiv_tb();
 
   reg CLKtb;
 
+  reg reset_tb;
+
   intdiv_intdiv #(.N(N)) 
 	intdiv (
 	.x(x_tb),
 	.y(y_tb),
 	.reg_z(z_tb),
 	.reg_r(r_tb),
+	.reset(reset_tb),
 	.clock(CLKtb)
 	);
 
@@ -337,12 +357,15 @@ module intdiv_intdiv_tb();
   y_tb = 5'd11;
   #100;
   */
+  reset_tb = 1;
   x_tb = 5'd7;
   y_tb = 5'd3;
-  #1000;
+  #10000;
+  reset_tb = 0;
+  #10000;
   x_tb = -5'd120;
   y_tb = 5'd11;
-  #1000;
+  #10000;
   $stop;
   end
 

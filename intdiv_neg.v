@@ -23,7 +23,7 @@ module intdiv_neg(xbit, sign, y);
      case ({xbit, sign})
 	{1'b1, 1'b0}: begin y <= `POS1; end
 	{1'b1, 1'b1}: begin y <= `NEG1; end
-	default: begin y <= `DONTCARES; end
+	default: begin y <= `ZERO_1; end
      endcase
   end
 

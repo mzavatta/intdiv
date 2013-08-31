@@ -112,8 +112,8 @@ module intdiv_ovf(minm, minl, tr, res, sign_out, wrong);
 		  	wrong <= 1'b0;
 			end//7
 	default: begin
-		  res <= `DONTCARES;
-		  sign_out <= `DONTCARES;
+		  res <= `ZERO_1;
+		  sign_out <= `ZERO_1;
 		  wrong <= 1'bx;
 		  end
   endcase

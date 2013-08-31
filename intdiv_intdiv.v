@@ -67,6 +67,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
   //to hold adj cell output
   reg reg_padj;
+  reg reg_seladj;
 
   wire [1:0] sprop[N-1:0][N-1:0];
   wire [1:0] ssprop[N-1:0];
@@ -230,12 +231,13 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	//load operands for padjuster
 	reg_p[STAGESBODY-1][N-1:N-STEPS] <= p[N-1:N-STEPS];
 	reg_padj <= padj;
+	reg_seladj <= seladj;
 
 	//load operands for negconv
 	reg_rflat <= rflat;
 
 	//compose outputs in their register
-	reg_z[0] <= seladj;
+	reg_z[0] <= reg_seladj;
 	reg_z[N-1:1] <= z[N-1:1];
 	reg_r <= r;
 
@@ -258,6 +260,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		reg_p[pp][pp*STEPS+:STEPS] <= p[pp*STEPS+:STEPS];
 	end
 
+	/*
 	//propagate partial quotients
 	for (pp=0; pp<STAGESBODY-1; pp=pp+1)
 	begin
@@ -266,6 +269,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		reg_p[pp][ss*STEPS+:STEPS] <= reg_p[pp+1][ss*STEPS+:STEPS];
 		end
 	end
+	*/
 
 	//propagate partial quotients
 	for (pp=0; pp<STAGESBODY-1; pp=pp+1)
@@ -358,11 +362,17 @@ module intdiv_intdiv_tb();
   #100;
   */
   reset_tb = 1;
+  #2000;
+  reset_tb = 0;
   x_tb = 5'd7;
   y_tb = 5'd3;
-  #10000;
-  reset_tb = 0;
-  #10000;
+  #PERIOD;
+  x_tb = 5'd10;
+  y_tb = 5'd4;
+  #PERIOD;
+  x_tb = -5'd13;
+  y_tb = 5'd4;
+  #PERIOD;
   x_tb = -5'd120;
   y_tb = 5'd11;
   #10000;

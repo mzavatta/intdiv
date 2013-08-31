@@ -166,12 +166,6 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 			end
 		end
 	end
-
-	/*
-	st = 2'b0;
-	st = st-1;
-  	if (st==0) begin st=STEPS-1; sg=sg-1; end
-	*/
   end
 
   for (j=N-1; j>=0; j=j-1) begin: star
@@ -224,6 +218,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	end
   end
   else begin
+
 	//load and propagate inputs
 	reg_y[STAGES-1] <= y;
 	reg_x[STAGES-1] <= x;
@@ -258,31 +253,16 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		reg_sign[pp] <= sign[pp*STEPS];
 	end
 
+	//store quotient digits
 	for (pp=STAGESBODY-1; pp>=0; pp=pp-1)
 	begin
-		//store quotient digits
-		//reg_p[pp][((pp+1)*STEPS)-1:pp*STEPS] <= p[((pp+1)*STEPS)-1:pp*STEPS];
+
 		reg_p[pp][pp*STEPS+:STEPS] <= p[pp*STEPS+:STEPS];
 	end
 
-	/*
 	//propagate partial quotients
 	for (pp=0; pp<STAGESBODY-1; pp=pp+1)
 	begin
-		//reg_p[pp][N-1+:N-(STAGES-pp-1)*STEPS] <= reg_p[pp+1][N-1+:N-(STAGES-pp-1)*STEPS];
-		for(ss=STAGESBODY-1; ss>=0; ss=ss-1) begin
-		reg_p[pp][ss*STEPS+:STEPS] <= reg_p[pp+1][ss*STEPS+:STEPS];
-		end
-	end
-	*/
-
-	//propagate partial quotients
-	for (pp=0; pp<STAGESBODY-1; pp=pp+1)
-	begin
-		//reg_p[pp][N-1+:N-(STAGES-pp-1)*STEPS] <= reg_p[pp+1][N-1+:N-(STAGES-pp-1)*STEPS];
-		//for(ss=0; ss<STAGESBODY-1; ss=ss+1) begin
-		//reg_p[pp][ss*STEPS+:STEPS] <= reg_p[pp+1][ss*STEPS+:STEPS];
-		//end
 		for (ss=0; ss<STAGESBODY-1-pp; ss=ss+1) begin
 		reg_p[pp][(N-1)-ss*STEPS-:STEPS] <= reg_p[pp+1][(N-1)-ss*STEPS-:STEPS];
 		end
@@ -311,7 +291,6 @@ module intdiv_intdiv_tb();
   reg alarm;
 
   reg CLKtb;
-
   reg reset_tb;
 
   intdiv_intdiv #(.N(N)) 
@@ -325,15 +304,15 @@ module intdiv_intdiv_tb();
 	);
 
   integer i, j, k;
-
-
+  
+  //automated exhaustive self-checking
+  /*
   initial
   begin
 	i=0;
 	j=1;
 	reset_tb=0;
   end
-
   always
   begin
 	CLKtb=0;
@@ -341,13 +320,8 @@ module intdiv_intdiv_tb();
 	CLKtb=1;
 	#(PERIOD/2);
   end
-
   always@(negedge CLKtb)
   begin
-	/*for (k=0; k<STAGESTOTAL-1; k=k+1) begin
-		x_tb[k+1] <= x_tb[k];
-		y_tb[k+1] <= y_tb[k]; 
-	end*/
 	for (k=0; k<STAGESTOTAL-1; k=k+1) begin
 		z_exp[k+1] <= z_exp[k];
 		r_exp[k+1] <= r_exp[k];
@@ -361,13 +335,12 @@ module intdiv_intdiv_tb();
 			j=j+1;			
 		end
 		else begin
-			j=1;
+			j=1;  //avoid division by 0
 			i=i+1;
 		end
 	end
 	else $stop;
   end
-
   always@(negedge CLKtb)
   begin
 	if (z_tb != z_exp[STAGESTOTAL-1] || r_tb != r_exp[STAGESTOTAL-1]) begin
@@ -376,43 +349,10 @@ module intdiv_intdiv_tb();
 	end
 	else alarm = 1'b0;
   end
-
-  /*
-  initial
-  begin
   */
   
-  /*
-  //automated exhaustive self-checking
-  alarm = 1'b0;
-  x_tb = 5'd0;
-  y_tb = 5'd0;
-  for (i=0; i<(2**N); i=i+1) begin
-	alarm = 1'b0;
-	x_tb = i;
-	for (j=1; j<(2**N); j=j+1) begin //excludes division by zero
-		y_tb = j;
-		#10;
-		z_exp = x_tb/y_tb;
-		r_exp = x_tb%y_tb;
-	  	if (z_tb != z_exp || r_tb != r_exp) begin
-			$display ("Error: expected values z=%d r=%d, got values %d %d", z_exp, r_exp, z_tb, r_tb);
-			alarm = 1'b1;
-		end
-	  	#100;
-	end
-  end
-  */
-  /*
-  x_tb = 5'd30;
-  y_tb = 5'd7;
-  #100;
-  x_tb = -5'd120;
-  y_tb = 5'd11;
-  #100;
-  */
-
-  /*
+  initial
+  begin
   reset_tb = 1;
   #2000;
   reset_tb = 0;
@@ -430,6 +370,5 @@ module intdiv_intdiv_tb();
   #10000;
   $stop;
   end
-  */
 
 endmodule

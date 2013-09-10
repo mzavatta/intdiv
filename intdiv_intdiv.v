@@ -16,8 +16,9 @@
 `define NEGATIVE 1'b1
 `define POSITIVE 1'b0
 
-`define BOUND (i+1)%STEPS
-`define STG (i/STEPS)+1
+//`define BOUND (i+1)%STEPS
+`define BOUND j%PSTEPS
+`define STG (i+j/PSTEPS)+1
 
 module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
@@ -27,6 +28,9 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   parameter STAGESBODY=STAGES-1; //division of the circuit body, excludes input and output stage
   //output stage is padjust, negconv stage
   parameter STEPS=N/STAGESBODY;
+  parameter QSTEPS=N;
+  parameter PSTEPS=4*QSTEPS;
+  parameter FPSTEPS=(N+1)%PSTEPS; //unused and wrong
 
   // IN
   input [N-1:0] x;  //DIVIDEND

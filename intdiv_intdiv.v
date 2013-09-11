@@ -21,8 +21,8 @@
 
 module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
-  parameter N=4;
-  parameter STAGESTOTAL=6;  //pipeline stages
+  parameter N=9;
+  parameter STAGESTOTAL=5;  //pipeline stages
   parameter STAGES=STAGESTOTAL-1; //length of input chain, from the total exclude output stage
   parameter STAGESBODY=STAGES-1; //division of the circuit body, excludes input and output stage
   //output stage is padjust, negconv stage
@@ -275,11 +275,11 @@ endmodule
 //test bench
 module intdiv_intdiv_tb();
 
-  parameter N = 4;
+  parameter N = 9;
 
   parameter PERIOD = 1000;
 
-  parameter STAGESTOTAL = 6;
+  parameter STAGESTOTAL = 5;
 
   reg signed [N-1:0] x_tb;
   reg signed [N-1:0] y_tb;
@@ -306,7 +306,7 @@ module intdiv_intdiv_tb();
   integer i, j, k;
   
   //automated exhaustive self-checking
-  /*
+  
   initial
   begin
 	i=0;
@@ -349,8 +349,8 @@ module intdiv_intdiv_tb();
 	end
 	else alarm = 1'b0;
   end
-  */
   
+  /*
   initial
   begin
   reset_tb = 1;
@@ -370,5 +370,6 @@ module intdiv_intdiv_tb();
   #10000;
   $stop;
   end
+  */
 
 endmodule

@@ -17,8 +17,10 @@
 `define POSITIVE 1'b0
 
 //`define BOUND (i+1)%STEPS
-`define BOUND j%PSTEPS
-`define STG (i+j/PSTEPS)+1
+`define BOUND ((jj-1)%(PSTEPS/())))
+//`define STG (ii+((jj-1)/PSTEPS))
+`define STG ((ii/(NPROPS/4))+((jj-1+(ii%(NPROPS/4)*4)/NPROPS))
+`define BOUNDLINE ((ii-1)%(PSTEPS/4)) //OVF or SGN after next to the bound
 
 module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
@@ -108,11 +110,8 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
   generate
 
-  for (i=N-1; i>=0; i=i-1) begin: row
-
-	if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[STAGES-1][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
-	else if (`BOUND==0) intdiv_ovf ovf(reg_rc[`STG][N], reg_rc[`STG][N-1], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
-	else intdiv_ovf ovf(rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
+  for (i=N; i>=0; i=i-1) begin: row
+	localparam integer ii = N-1-i;
 
 	if (i!=0) begin
 		if (i==N-1) begin
@@ -120,7 +119,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		   intdiv_neg neg(reg_x[STAGES-1][i-1], sign[i], xneg[i-1]);
 		   xnor cmpp(p[i], sign[i], reg_y[STAGES-1][N-1]);
 		end
-		else if (`BOUND==0) begin
+		else if (`BOUNDLINE==0) begin
 		   intdiv_sgn sgn(sprop[i][0], reg_sign[`STG], sign[i]);
 		   intdiv_neg neg(reg_x[`STG][i-1], sign[i], xneg[i-1]);
 		   xnor cmpp(p[i], sign[i], reg_y[`STG][N-1]);
@@ -137,17 +136,31 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	end
 
 	for (j=N-2; j>=0; j=j-1) begin: col
+	   localparam integer jj = N-1-j;
+
+	   if (jj==0) begin
+		if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[STAGES-1][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
+		else if (ii=N) 
+		else if (`BOUNDLINE==0) intdiv_ovf ovf(reg_rc[i+1][N-1], reg_rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
+		else intdiv_ovf ovf(rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
+	   end
+	   else
 		if (i==N-1) begin //upper row
 			xor cmpy(d[`STG][j], reg_y[`STG][N-1], reg_y[`STG][j]);
 			if (j==0) begin
 				intdiv_sub sub(d[`STG][j], {reg_x[`STG][N-1], 1'b0}, ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost
 			end
+			else if (`BOUND==0) begin
+				intdiv_sub sub(d[`STG][j], 2'b00, ps[i][j], tr[i][j]);
+				intdiv_abs abs(ps[i][j], tr[i][j-1], reg_sprop[i][j+1], rc[i][j], sprop[i][j]);
+			end
 			else begin
 				intdiv_sub sub(d[`STG][j], 2'b00, ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end
+		/*
 		else if (`BOUND==0) begin
 			xor cmpy(d[`STG][j], reg_y[`STG][N-1], reg_y[`STG][j]);
 			if (j==0) begin
@@ -159,17 +172,36 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end
+		*/
 		else begin
 			if (j==0) begin //rightmost
 			intdiv_sub sub(d[`STG][j], xneg[i], ps[i][j], tr[i][j]);
 			intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
+			end
+			else if (`BOUND==0) begin
+			intdiv_sub sub(d[`STG][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
+			intdiv_abs abs(reg_ps[i][j], reg_tr[i][j-1], reg_sprop[i][j+1], rc[i][j], sprop[i][j]);
+			end
+			else if (`BOUND-1==0) begin
+			intdiv_sub sub(d[`STG][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
+			intdiv_abs abs(reg_ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
+			end
+			else if (`BOUND-2==0) begin
+			intdiv_sub sub(d[`STG][j], reg_rc[i+1][j], ps[i][j], tr[i][j]);
+			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 			else begin
 			intdiv_sub sub(d[`STG][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
 			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end
+	   end
+	   jj=jj+1;
+
 	end
+	end
+
+	ii=ii+1;
   end
 
   for (j=N-1; j>=0; j=j-1) begin: star

@@ -17,22 +17,25 @@
 `define POSITIVE 1'b0
 
 //`define BOUND (i+1)%STEPS
-`define BOUND ((jj-1)%(PSTEPS/())))
-//`define STG (ii+((jj-1)/PSTEPS))
-`define STG ((ii/(NPROPS/4))+((jj-1+(ii%(NPROPS/4)*4)/NPROPS))
-`define BOUNDLINE ((ii-1)%(PSTEPS/4)) //OVF or SGN after next to the bound
+`define BOUND ((jj-1+(ii%(NPROPS/4)*4)%NPROPS))
+//`define STG (ii+((jj-1)/NPROPS))
+`define STG (  (ii/(NPROPS/4))  +  ((jj-1+(ii%((NPROPS/4)*4))) /NPROPS)  )
+`define BOUNDLINE ((ii-1)%(NPROPS/4)) //OVF or SGN after next to the bound
 
 module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
   parameter N=4;
-  parameter STAGESTOTAL=6;  //pipeline stages
-  parameter STAGES=STAGESTOTAL-1; //length of input chain, from the total exclude output stage
-  parameter STAGESBODY=STAGES-1; //division of the circuit body, excludes input and output stage
+  //parameter STAGESTOTAL=6;  //pipeline stages
+  parameter STAGES=STAGESBODY+1; //length of input chain, from the total exclude output stage
+  //parameter STAGESBODY=STAGES-1; //division of the circuit body, excludes input and output stage
+  parameter STAGESBODY=((5*N)/NPROPS);
   //output stage is padjust, negconv stage
-  parameter STEPS=N/STAGESBODY;
-  parameter QSTEPS=N;
-  parameter PSTEPS=4*QSTEPS;
-  parameter FPSTEPS=(N+1)%PSTEPS; //unused and wrong
+  //parameter STEPS=N/STAGESBODY;
+  parameter STEPS=QSTEPS;
+  parameter QSTEPS=N/NPROPS;
+  //parameter NPROPS=4*QSTEPS;
+  parameter NPROPS=4;
+  parameter FPSTEPS=(N+1)%NPROPS; //unused and wrong
 
   // IN
   input [N-1:0] x;  //DIVIDEND
@@ -48,7 +51,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   wire [N-1:0] z;
   wire [N-1:0] r;
 
-  wire [N-2:0] d[STAGES-1:0];
+  wire [N-2:0] d[STAGES+1:0];
 
   //wire [1:0] rc[N-1:0][N-1:0]; //N iterations, N-1 bits wide numbers
   wire [1:0] rc[N-1:0][N-1:0];
@@ -61,17 +64,20 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
   //rc contents to be copied in reg_rc at stage output
   //reg_rc to be used as stage input
-  reg [1:0] reg_rc[STAGESBODY-1:0][N:0];
+  reg [1:0] reg_rc[N-1:0][N:0];
   //reg reg_ps[STAGESBODY-1:0][N-2:0];
   //reg reg_tr[STAGESBODY-1:0][N-2:0];
 
   //have to hold dividend and divisors for the S operands simultaneously
-  reg [N-1:0] reg_x[STAGES-1:0];
-  reg [N-1:0] reg_y[STAGES-1:0];
+  /*reg [N-1:0] reg_x[STAGES-1:0];
+  reg [N-1:0] reg_y[STAGES-1:0];*/
+  reg [N-1:0] reg_x[STAGES+1:0];
+  reg [N-1:0] reg_y[STAGES+1:0];
   //reg [N-2:0] reg_d[S-1:0];
 
   //to hold sign outputs
-  reg [STAGESBODY-1:0] reg_sign;
+  //reg [STAGESBODY-1:0] reg_sign;
+  reg reg_sign[N-1:0];
 
   //to hold adj cell output
   reg reg_padj;
@@ -83,6 +89,13 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   wire tr[N-1:0][N-2:0];
   wire psl[N-1:0];
   wire trl[N-1:0];
+
+  reg [1:0] reg_sprop[N-1:0][N-1:0];
+  reg [1:0] reg_ssprop[N-1:0];
+  reg reg_ps[N-1:0][N-2:0];
+  reg reg_tr[N-1:0][N-2:0];
+  reg reg_psl[N-1:0];
+  reg reg_trl[N-1:0];
 
   wire [1:0] xneg[N-2:0];
   wire [N-1:0] p; 
@@ -110,9 +123,10 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
   generate
 
-  for (i=N; i>=0; i=i-1) begin: row
+  for (i=N-1; i>=0; i=i-1) begin: row
 	localparam integer ii = N-1-i;
 
+	localparam integer jj = N;
 	if (i!=0) begin
 		if (i==N-1) begin
 		   intdiv_sgn sgn(sprop[i][0], reg_x[STAGES-1][i], sign[i]);
@@ -130,21 +144,22 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		   xnor cmpp(p[i], sign[i], reg_y[`STG][N-1]);
 		end
 	end
-	else begin
-		if (`BOUND==0) intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], reg_sign[`STG], sprop[i][0], ssprop[0], padj, seladj);
-		else intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
-	end
+	else//begin
+		//if (`BOUNDLINE==0) intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], reg_sign[`STG], sprop[i][0], ssprop[0], padj, seladj);
+		//else 
+		intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
+	//end
 
 	for (j=N-2; j>=0; j=j-1) begin: col
 	   localparam integer jj = N-1-j;
 
 	   if (jj==0) begin
 		if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[STAGES-1][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
-		else if (ii=N) 
+		//else if (ii=N) intdiv_abs abs(psl[j], trl[j-1], 2'b00, rs[j], ssprop[j]);
 		else if (`BOUNDLINE==0) intdiv_ovf ovf(reg_rc[i+1][N-1], reg_rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 		else intdiv_ovf ovf(rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 	   end
-	   else
+	   else begin
 		if (i==N-1) begin //upper row
 			xor cmpy(d[`STG][j], reg_y[`STG][N-1], reg_y[`STG][j]);
 			if (j==0) begin
@@ -160,30 +175,23 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 				intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end
-		/*
-		else if (`BOUND==0) begin
-			xor cmpy(d[`STG][j], reg_y[`STG][N-1], reg_y[`STG][j]);
-			if (j==0) begin
-			intdiv_sub sub(d[`STG][j], reg_rc[`STG][j], ps[i][j], tr[i][j]); //rec_rc because in its lsb it stores xneg
-			intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
-			end
-			else begin
-			intdiv_sub sub(d[`STG][j], reg_rc[`STG][j], ps[i][j], tr[i][j]);
-			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
-			end
-		end
-		*/
 		else begin
 			if (j==0) begin //rightmost
-			intdiv_sub sub(d[`STG][j], xneg[i], ps[i][j], tr[i][j]);
-			intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
+			   if (`BOUND-2==0) begin
+				intdiv_sub sub(d[`STG][j], reg_rc[i+1][j], ps[i][j], tr[i][j]);
+				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
+			   end
+			   else begin
+				intdiv_sub sub(d[`STG][j], xneg[i], ps[i][j], tr[i][j]);
+				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
+			   end
 			end
 			else if (`BOUND==0) begin
-			intdiv_sub sub(d[`STG][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
+			intdiv_sub sub(d[`STG-1][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
 			intdiv_abs abs(reg_ps[i][j], reg_tr[i][j-1], reg_sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 			else if (`BOUND-1==0) begin
-			intdiv_sub sub(d[`STG][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
+			intdiv_sub sub(d[`STG-1][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
 			intdiv_abs abs(reg_ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 			else if (`BOUND-2==0) begin
@@ -196,20 +204,38 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 			end
 		end
 	   end
-	   jj=jj+1;
-
 	end
-	end
-
-	ii=ii+1;
   end
 
   for (j=N-1; j>=0; j=j-1) begin: star
-	if (j<N-1) intdiv_sub sub(d[1][j], rc[0][j], psl[j], trl[j]);
-	else intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
-	if (j==N-1) intdiv_abs abs(psl[j], trl[j-1], 2'b00, rs[j], ssprop[j]);
-	else if (j==0) intdiv_abs abs(psl[j], reg_y[1][N-1], ssprop[j+1], rs[j], ssprop[j]);
-	else intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
+    localparam integer ii = N;
+    localparam integer jj = N-1-j;
+	//if (j<N-1) intdiv_sub sub(d[1][j], rc[0][j], psl[j], trl[j]);
+	//else intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
+	if (j==N-1) begin 
+	   intdiv_abs abs(psl[j], trl[j-1], 2'b00, rs[j], ssprop[j]);
+	   intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
+	end
+	else if (j==0) begin 
+	   intdiv_abs abs(psl[j], reg_y[1][N-1], ssprop[j+1], rs[j], ssprop[j]);
+	   intdiv_sub sub(d[1][j], rc[0][j], psl[j], trl[j]);
+	end
+	else if (`BOUND==0) begin
+	   intdiv_sub sub(d[`STG-1][j], rc[0][j], psl[j], trl[j]);
+	   intdiv_abs abs(reg_psl[j], reg_trl[j-1], reg_ssprop[j+1], rs[j], ssprop[j]);
+	end
+	else if (`BOUND==1) begin
+	   intdiv_sub sub(d[`STG-1][j], rc[0][j], psl[j], trl[j]);
+	   intdiv_abs abs(reg_psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
+	end
+	else if (`BOUND==0) begin
+	   intdiv_sub sub(d[`STG][j], reg_rc[0][j], psl[j], trl[j]);
+	   intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
+	end
+	else begin
+	   intdiv_sub sub(d[1][j], rc[0][j], psl[j], trl[j]);
+	   intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
+	end
   end
 
   for (j=N-1; j>=0; j=j-1) begin: select
@@ -239,7 +265,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   always @(posedge clock)
   begin
 
-  if (reset==1'b1) begin
+/*  if (reset==1'b1) begin
 	for (pp=0; pp<=STAGES-1; pp=pp+1)
         begin
 	reg_y[pp] <= 0;
@@ -253,7 +279,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		reg_sign[pp] <= 0;
 	end
   end
-  else begin
+  else begin */
 
 	//load and propagate inputs
 	reg_y[STAGES-1] <= y;
@@ -277,16 +303,16 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	reg_z[N-1:1] <= z[N-1:1];
 	reg_r <= r;
 
-	for (pp=0; pp<STAGESBODY; pp=pp+1)
+	for (pp=0; pp<N; pp=pp+1)
 	begin
 		//store partial reminders performing a shift in indexes
 		for(cc=N; cc>0; cc=cc-1) begin
-			reg_rc[pp][cc] <= rc[pp*STEPS][cc-1];
+			reg_rc[pp][cc] <= rc[pp][cc-1];
 		end
 		if(pp!=0) reg_rc[pp][0] <= xneg[pp*STEPS-1];
 
 		//store sign chain
-		reg_sign[pp] <= sign[pp*STEPS];
+		reg_sign[pp] <= sign[pp];
 	end
 
 	//store quotient digits
@@ -303,7 +329,6 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		reg_p[pp][(N-1)-ss*STEPS-:STEPS] <= reg_p[pp+1][(N-1)-ss*STEPS-:STEPS];
 		end
 	end
-  end
   end
 
 endmodule

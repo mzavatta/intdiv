@@ -24,18 +24,14 @@
 
 module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
-  parameter N=4;
-  //parameter STAGESTOTAL=6;  //pipeline stages
-  parameter STAGES=STAGESBODY+1; //length of input chain, from the total exclude output stage
-  //parameter STAGESBODY=STAGES-1; //division of the circuit body, excludes input and output stage
-  parameter STAGESBODY=((5*N)/NPROPS);
-  //output stage is padjust, negconv stage
-  //parameter STEPS=N/STAGESBODY;
-  parameter STEPS=QSTEPS;
-  parameter QSTEPS=N/NPROPS;
-  //parameter NPROPS=4*QSTEPS;
-  parameter NPROPS=4;
-  parameter FPSTEPS=(N+1)%NPROPS; //unused and wrong
+  parameter N=4; //operands width
+  parameter NPROPS=4; //propagations to be done in each stage
+  parameter STAGESBODY=((5*N)/NPROPS); //total stages in the body
+  parameter STAGES=STAGESBODY+2; //accounts for load operands and output stage
+  parameter STAGESOUT=(STAGESBODY-(N/NPROPS)-1); //cycles from the first produced quotient digit to the last
+  parameter QSTEPS=(NPROPS/4); //quotient digits produced in one generic stage
+  parameter INITQSTEPS=(QSTEPS-((N/NPROPS)-1)); //quotient digits produced in the first stage
+  parameter ENDQSTEPS=((N-INITQSTEPS)%QSTEPS); //quotient digits produced in the last stage
 
   // IN
   input [N-1:0] x;  //DIVIDEND
@@ -51,7 +47,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   wire [N-1:0] z;
   wire [N-1:0] r;
 
-  wire [N-2:0] d[STAGES+1:0];
+  wire [N-2:0] d;
 
   //wire [1:0] rc[N-1:0][N-1:0]; //N iterations, N-1 bits wide numbers
   wire [1:0] rc[N-1:0][N-1:0];
@@ -62,26 +58,10 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
   reg [((N-1)*2)+1:0] reg_rflat;
 
-  //rc contents to be copied in reg_rc at stage output
-  //reg_rc to be used as stage input
-  reg [1:0] reg_rc[N-1:0][N:0];
-  //reg reg_ps[STAGESBODY-1:0][N-2:0];
-  //reg reg_tr[STAGESBODY-1:0][N-2:0];
-
   //have to hold dividend and divisors for the S operands simultaneously
-  /*reg [N-1:0] reg_x[STAGES-1:0];
-  reg [N-1:0] reg_y[STAGES-1:0];*/
-  reg [N-1:0] reg_x[STAGES+1:0];
-  reg [N-1:0] reg_y[STAGES+1:0];
-  //reg [N-2:0] reg_d[S-1:0];
-
-  //to hold sign outputs
-  //reg [STAGESBODY-1:0] reg_sign;
-  reg reg_sign[N-1:0];
-
-  //to hold adj cell output
-  reg reg_padj;
-  reg reg_seladj;
+  reg [N-1:0] reg_x[STAGES-1:0];
+  reg [N-1:0] reg_y[STAGES-1:0];
+  reg [N-2:0] reg_d[STAGES-1:0];
 
   wire [1:0] sprop[N-1:0][N-1:0];
   wire [1:0] ssprop[N-1:0];
@@ -90,6 +70,8 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   wire psl[N-1:0];
   wire trl[N-1:0];
 
+  //elements at stage boundaries input from these regs instead of the wires
+  reg [1:0] reg_rc[N-1:0][N:0]; //additional width to account for shift and xneg entry
   reg [1:0] reg_sprop[N-1:0][N-1:0];
   reg [1:0] reg_ssprop[N-1:0];
   reg reg_ps[N-1:0][N-2:0];
@@ -100,16 +82,20 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   wire [1:0] xneg[N-2:0];
   wire [N-1:0] p; 
 
-  reg [N-1:0] reg_p[STAGESBODY-1:0];
+  reg [N-1:0] reg_p[STAGESOUT-1:0];
   //as many as the pipeline stages in order to hold the partially computed quotient
   //p[0] needs to be fed to the adjuster at every clock cycle
 
   wire sign[N-1:0];
+  //to hold sign outputs
+  reg reg_sign[N-1:0];
 
   wire padj, seladj;
+  //to hold adj cell output
+  reg reg_padj;
+  reg reg_seladj;
 
   wire wrong[N-1:0];
-  wire [1:0] lastovf;
 
   /* 
    * Signals are numbered with the same indexes of the elemets that generate them
@@ -154,52 +140,56 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	   localparam integer jj = N-1-j;
 
 	   if (jj==0) begin
-		if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[STAGES-1][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
+		if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 		//else if (ii=N) intdiv_abs abs(psl[j], trl[j-1], 2'b00, rs[j], ssprop[j]);
 		else if (`BOUNDLINE==0) intdiv_ovf ovf(reg_rc[i+1][N-1], reg_rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 		else intdiv_ovf ovf(rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 	   end
 	   else begin
 		if (i==N-1) begin //upper row
-			xor cmpy(d[`STG][j], reg_y[`STG][N-1], reg_y[`STG][j]);
+			xor cmpy(d[j], reg_y[STAGES-1][N-1], reg_y[STAGES-1][j]);
 			if (j==0) begin
-				intdiv_sub sub(d[`STG][j], {reg_x[`STG][N-1], 1'b0}, ps[i][j], tr[i][j]);
+				intdiv_sub sub(reg_d[`STG][j], {reg_x[`STG][N-1], 1'b0}, ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]); //rightmost
 			end
-			else if (`BOUND==0) begin
-				intdiv_sub sub(d[`STG][j], 2'b00, ps[i][j], tr[i][j]);
+			else if (`BOUND==0) begin //grab sign from reg
+				intdiv_sub sub(reg_d[`STG][j], 2'b00, ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], tr[i][j-1], reg_sprop[i][j+1], rc[i][j], sprop[i][j]);
-			end
+			end/*
+			else if (jj>NPROPS) begin //can write also `STG>0 //grab d from proper register 
+				intdiv_sub sub(reg_d[`STG][j], 2'b00, ps[i][j], tr[i][j]);
+				intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
+			end*/
 			else begin
-				intdiv_sub sub(d[`STG][j], 2'b00, ps[i][j], tr[i][j]);
+				intdiv_sub sub(reg_d[`STG][j], 2'b00, ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end
 		else begin
 			if (j==0) begin //rightmost
 			   if (`BOUND-2==0) begin
-				intdiv_sub sub(d[`STG][j], reg_rc[i+1][j], ps[i][j], tr[i][j]);
+				intdiv_sub sub(reg_d[`STG][j], reg_rc[i+1][j], ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			   end
 			   else begin
-				intdiv_sub sub(d[`STG][j], xneg[i], ps[i][j], tr[i][j]);
+				intdiv_sub sub(reg_d[`STG][j], xneg[i], ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			   end
 			end
 			else if (`BOUND==0) begin
-			intdiv_sub sub(d[`STG-1][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
+			intdiv_sub sub(reg_d[`STG-1][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
 			intdiv_abs abs(reg_ps[i][j], reg_tr[i][j-1], reg_sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 			else if (`BOUND-1==0) begin
-			intdiv_sub sub(d[`STG-1][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
+			intdiv_sub sub(reg_d[`STG-1][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
 			intdiv_abs abs(reg_ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 			else if (`BOUND-2==0) begin
-			intdiv_sub sub(d[`STG][j], reg_rc[i+1][j], ps[i][j], tr[i][j]);
+			intdiv_sub sub(reg_d[`STG][j], reg_rc[i+1][j], ps[i][j], tr[i][j]);
 			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 			else begin
-			intdiv_sub sub(d[`STG][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
+			intdiv_sub sub(reg_d[`STG][j], rc[i+1][j-1], ps[i][j], tr[i][j]);
 			intdiv_abs abs(ps[i][j], tr[i][j-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			end
 		end
@@ -217,23 +207,23 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	   intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
 	end
 	else if (j==0) begin 
+	   intdiv_sub sub(reg_d[1][j], rc[0][j], psl[j], trl[j]);
 	   intdiv_abs abs(psl[j], reg_y[1][N-1], ssprop[j+1], rs[j], ssprop[j]);
-	   intdiv_sub sub(d[1][j], rc[0][j], psl[j], trl[j]);
 	end
 	else if (`BOUND==0) begin
-	   intdiv_sub sub(d[`STG-1][j], rc[0][j], psl[j], trl[j]);
+	   intdiv_sub sub(reg_d[`STG-1][j], rc[0][j], psl[j], trl[j]);
 	   intdiv_abs abs(reg_psl[j], reg_trl[j-1], reg_ssprop[j+1], rs[j], ssprop[j]);
 	end
 	else if (`BOUND==1) begin
-	   intdiv_sub sub(d[`STG-1][j], rc[0][j], psl[j], trl[j]);
+	   intdiv_sub sub(reg_d[`STG-1][j], rc[0][j], psl[j], trl[j]);
 	   intdiv_abs abs(reg_psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
 	end
 	else if (`BOUND==0) begin
-	   intdiv_sub sub(d[`STG][j], reg_rc[0][j], psl[j], trl[j]);
+	   intdiv_sub sub(reg_d[`STG][j], reg_rc[0][j], psl[j], trl[j]);
 	   intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
 	end
 	else begin
-	   intdiv_sub sub(d[1][j], rc[0][j], psl[j], trl[j]);
+	   intdiv_sub sub(reg_d[1][j], rc[0][j], psl[j], trl[j]);
 	   intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
 	end
   end
@@ -282,16 +272,28 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   else begin */
 
 	//load and propagate inputs
+	/*
 	reg_y[STAGES-1] <= y;
 	reg_x[STAGES-1] <= x;
+	reg_d[STAGES-1] <= d;
 	for (pp=0; pp<STAGES-1; pp=pp+1)
         begin
 		reg_y[pp] <= reg_y[pp+1];
 		reg_x[pp] <= reg_x[pp+1];
+		reg_d[pp] <= reg_d[pp+1];
+	end */
+	reg_y[0] <= y;
+	reg_x[0] <= x;
+	reg_d[0] <= d;
+	for (pp=0; pp<STAGES-1; pp=pp+1)
+        begin
+		reg_y[pp+1] <= reg_y[pp];
+		reg_x[pp+1] <= reg_x[pp];
+		reg_d[pp+1] <= reg_d[pp];
 	end
 
 	//load operands for padjuster
-	reg_p[STAGESBODY-1][N-1:N-STEPS] <= p[N-1:N-STEPS];
+	//reg_p[STAGESBODY-1][N-1:N-QSTEPS] <= p[N-1:N-QSTEPS];
 	reg_padj <= padj;
 	reg_seladj <= seladj;
 
@@ -309,26 +311,38 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		for(cc=N; cc>0; cc=cc-1) begin
 			reg_rc[pp][cc] <= rc[pp][cc-1];
 		end
-		if(pp!=0) reg_rc[pp][0] <= xneg[pp*STEPS-1];
+		if(pp!=0) reg_rc[pp][0] <= xneg[pp-1];
 
 		//store sign chain
 		reg_sign[pp] <= sign[pp];
 	end
 
 	//store quotient digits
+	/*
 	for (pp=STAGESBODY-1; pp>=0; pp=pp-1)
 	begin
 
 		reg_p[pp][pp*STEPS+:STEPS] <= p[pp*STEPS+:STEPS];
 	end
+	*/
+	reg_p[STAGESOUT-1][N-1-:INITQSTEPS] <= p[N-1-:INITQSTEPS]; //store first
+	reg_p[0][0+:1] <= p[0+:1];  //store last
+	for (pp=0; pp<STAGESOUT-2; pp=pp+1) //store intermediate segments
+	begin
+		reg_p[STAGESOUT-2-pp][N-1-INITQSTEPS-(pp*QSTEPS)-:QSTEPS] <= p[N-1-INITQSTEPS-(pp*QSTEPS)+:QSTEPS];
+	end
 
 	//propagate partial quotients
-	for (pp=0; pp<STAGESBODY-1; pp=pp+1)
+	//propagate first row
+	for (pp=0; pp<STAGESOUT-1; pp=pp+1)
+		 reg_p[pp][N-1-:INITQSTEPS] <= reg_p[pp+1][N-1-:INITQSTEPS];
+	for (pp=0; pp<STAGESOUT-2; pp=pp+1) //propagate intermediate rows
 	begin
-		for (ss=0; ss<STAGESBODY-1-pp; ss=ss+1) begin
-		reg_p[pp][(N-1)-ss*STEPS-:STEPS] <= reg_p[pp+1][(N-1)-ss*STEPS-:STEPS];
+		for (ss=0; ss<STAGESOUT-2-pp; ss=ss+1) begin
+		reg_p[pp][(N-1)-INITQSTEPS-ss*QSTEPS-:QSTEPS] <= reg_p[pp+1][(N-1)-INITQSTEPS-ss*QSTEPS-:QSTEPS];
 		end
 	end
+	//last row does not need prop
   end
 
 endmodule

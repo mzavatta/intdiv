@@ -17,10 +17,11 @@
 `define POSITIVE 1'b0
 
 //`define BOUND (i+1)%STEPS
-`define BOUND ((jj-1+(ii%(NPROPS/4)*4)%NPROPS))
+`define BOUND ( (( jj-1+ ((ii%(NPROPS/4))*4) ) %NPROPS)  )
 //`define STG (ii+((jj-1)/NPROPS))
-`define STG (  (ii/(NPROPS/4))  +  ((jj-1+(ii%((NPROPS/4)*4))) /NPROPS)  )
+`define STG (  (ii/(NPROPS/4))  +       (( jj-1+ ((ii%(NPROPS/4))*4) ) /NPROPS)         )
 `define BOUNDLINE ((ii-1)%(NPROPS/4)) //OVF or SGN after next to the bound
+`define BOUNDONLINE ((ii)%(NPROPS/4)) //OVF or SGN after next to the bound
 
 module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 
@@ -89,6 +90,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
   wire sign[N-1:0];
   //to hold sign outputs
   reg reg_sign[N-1:0];
+  reg reg_sign_pause;
 
   wire padj, seladj;
   //to hold adj cell output
@@ -115,12 +117,12 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	localparam integer jj = N;
 	if (i!=0) begin
 		if (i==N-1) begin
-		   intdiv_sgn sgn(sprop[i][0], reg_x[STAGES-1][i], sign[i]);
-		   intdiv_neg neg(reg_x[STAGES-1][i-1], sign[i], xneg[i-1]);
-		   xnor cmpp(p[i], sign[i], reg_y[STAGES-1][N-1]);
+		   intdiv_sgn sgn(sprop[i][0], reg_x[`STG][i], sign[i]);
+		   intdiv_neg neg(reg_x[`STG][i-1], sign[i], xneg[i-1]);
+		   xnor cmpp(p[i], sign[i], reg_y[`STG][N-1]);
 		end
 		else if (`BOUNDLINE==0) begin
-		   intdiv_sgn sgn(sprop[i][0], reg_sign[`STG], sign[i]);
+		   intdiv_sgn sgn(sprop[i][0], reg_sign[i+1], sign[i]);
 		   intdiv_neg neg(reg_x[`STG][i-1], sign[i], xneg[i-1]);
 		   xnor cmpp(p[i], sign[i], reg_y[`STG][N-1]);
 		end
@@ -130,11 +132,18 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		   xnor cmpp(p[i], sign[i], reg_y[`STG][N-1]);
 		end
 	end
-	else//begin
-		//if (`BOUNDLINE==0) intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], reg_sign[`STG], sprop[i][0], ssprop[0], padj, seladj);
-		//else 
+	else begin
+	   if (N==4) begin
+		if (NPROPS==4) intdiv_adj adj(reg_x[`STG+1][N-1], reg_y[`STG+1][N-1], reg_sign_pause, reg_sprop[i][0], ssprop[0], padj, seladj);
+		else intdiv_adj adj(reg_x[`STG+1][N-1], reg_y[`STG+1][N-1], reg_sign[i+1], reg_sprop[i][0], ssprop[0], padj, seladj);
+	   end
+	   else begin
+		if (`BOUNDLINE==0)
+		intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], reg_sign[i+1], sprop[i][0], ssprop[0], padj, seladj);
+		else 
 		intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
-	//end
+	  end
+	end
 
 	for (j=N-1; j>=0; j=j-1) begin: col
 	   localparam integer jj = N-1-j;
@@ -142,7 +151,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	   if (jj==0) begin
 		if (i==N-1) intdiv_ovf ovf(2'b00, 2'b00, d[N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 		//else if (ii=N) intdiv_abs abs(psl[j], trl[j-1], 2'b00, rs[j], ssprop[j]);
-		else if (`BOUNDLINE==0) intdiv_ovf ovf(reg_rc[i+1][N-1], reg_rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
+		else if (`BOUNDLINE==0) intdiv_ovf ovf(reg_rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 		else intdiv_ovf ovf(rc[i+1][N-1], rc[i+1][N-2], tr[i][N-2], rc[i][N-1], sprop[i][N-1], wrong[i]);
 	   end
 	   else begin
@@ -167,11 +176,11 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		end
 		else begin
 			if (j==0) begin //rightmost
-			   if (`BOUND-2==0) begin
+			   if (`BOUND-2==0) begin //have to take xneg from reg_rc
 				intdiv_sub sub(reg_d[`STG][j], reg_rc[i+1][j], ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			   end
-			   else begin
+			   else begin //have to take xneg from wire
 				intdiv_sub sub(reg_d[`STG][j], xneg[i], ps[i][j], tr[i][j]);
 				intdiv_abs abs(ps[i][j], reg_y[`STG][N-1], sprop[i][j+1], rc[i][j], sprop[i][j]);
 			   end
@@ -204,21 +213,23 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	//else intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
 	if (j==N-1) begin 
 	   intdiv_abs abs(psl[j], trl[j-1], 2'b00, rs[j], ssprop[j]);
-	   intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
+	   if (`BOUNDONLINE==0) intdiv_sub sub(1'b0, reg_rc[0][j], psl[j], trl[j]);
+	   else intdiv_sub sub(1'b0, rc[0][j], psl[j], trl[j]);
 	end
-	else if (j==0) begin 
-	   intdiv_sub sub(reg_d[1][j], rc[0][j], psl[j], trl[j]);
-	   intdiv_abs abs(psl[j], reg_y[1][N-1], ssprop[j+1], rs[j], ssprop[j]);
+	else if (j==0) begin
+	   if (`BOUND-2==0) intdiv_sub sub(reg_d[`STG][j], reg_rc[0][j], psl[j], trl[j]);
+	   else intdiv_sub sub(reg_d[`STG][j], rc[0][j], psl[j], trl[j]);
+	   intdiv_abs abs(psl[j], reg_y[`STG][N-1], ssprop[j+1], rs[j], ssprop[j]);
 	end
 	else if (`BOUND==0) begin
 	   intdiv_sub sub(reg_d[`STG-1][j], rc[0][j], psl[j], trl[j]);
 	   intdiv_abs abs(reg_psl[j], reg_trl[j-1], reg_ssprop[j+1], rs[j], ssprop[j]);
 	end
-	else if (`BOUND==1) begin
+	else if (`BOUND-1==0) begin
 	   intdiv_sub sub(reg_d[`STG-1][j], rc[0][j], psl[j], trl[j]);
 	   intdiv_abs abs(reg_psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
 	end
-	else if (`BOUND==0) begin
+	else if (`BOUND-2==0) begin
 	   intdiv_sub sub(reg_d[`STG][j], reg_rc[0][j], psl[j], trl[j]);
 	   intdiv_abs abs(psl[j], trl[j-1], ssprop[j+1], rs[j], ssprop[j]);
 	end
@@ -309,7 +320,8 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 	begin
 		//store partial reminders performing a shift in indexes
 		for(cc=N; cc>0; cc=cc-1) begin
-			reg_rc[pp][cc] <= rc[pp][cc-1];
+			if (pp==0) reg_rc[pp][cc-1] <= rc[pp][cc-1]; //no shift in star row
+			else reg_rc[pp][cc] <= rc[pp][cc-1];
 			if (cc<N)
 				reg_sprop[pp][cc] <= sprop[pp][cc];
 			if (cc<N-1) begin
@@ -320,7 +332,16 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		if(pp!=0) reg_rc[pp][0] <= xneg[pp-1];
 
 		//store sign chain
-		reg_sign[pp] <= sign[pp];
+		if (N==4 && NPROPS==4)
+			reg_sign_pause <= reg_sign[1];
+		reg_sign[pp] <= sign[pp]; 
+	end
+
+	//store star row
+	for (pp=0; pp<N; pp=pp+1) begin
+		reg_ssprop[pp] <= ssprop[pp];
+		reg_psl[pp] <= psl[pp];
+		reg_trl[pp] <= trl[pp];
 	end
 
 	//store quotient digits

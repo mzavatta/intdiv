@@ -136,7 +136,7 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		intdiv_adj adj(reg_x[`STG][N-1], reg_y[`STG][N-1], sign[i+1], sprop[i][0], ssprop[0], padj, seladj); //last row, i=0
 	//end
 
-	for (j=N-2; j>=0; j=j-1) begin: col
+	for (j=N-1; j>=0; j=j-1) begin: col
 	   localparam integer jj = N-1-j;
 
 	   if (jj==0) begin
@@ -310,6 +310,12 @@ module intdiv_intdiv(clock, reset, x, y, reg_z, reg_r);
 		//store partial reminders performing a shift in indexes
 		for(cc=N; cc>0; cc=cc-1) begin
 			reg_rc[pp][cc] <= rc[pp][cc-1];
+			if (cc<N)
+				reg_sprop[pp][cc] <= sprop[pp][cc];
+			if (cc<N-1) begin
+				reg_ps[pp][cc] <= ps[pp][cc];
+				reg_tr[pp][cc] <= tr[pp][cc];
+			end
 		end
 		if(pp!=0) reg_rc[pp][0] <= xneg[pp-1];
 

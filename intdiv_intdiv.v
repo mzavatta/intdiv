@@ -33,11 +33,6 @@
 module intdiv_intdiv(clock, reset, x, y, z, r);
 
   parameter N=16;
-  //parameter STAGESTOTAL=6;  //pipeline stages
-  //parameter STAGES=STAGESTOTAL-1; //length of input chain, from the total exclude output stage
-  //parameter STAGESBODY=STAGES-1; //division of the circuit body, excludes input and output stage
-  //output stage is padjust, negconv stage
-  //parameter STEPS=N/STAGESBODY;
   parameter STAGES=4;
   parameter STEPS=N/STAGES;
 
@@ -47,13 +42,9 @@ module intdiv_intdiv(clock, reset, x, y, z, r);
   input clock;
   input reset;
   // OUT
-  //output [N-1:0] reg_z;  //FINAL QUOTIENT
-  //output [N-1:0] reg_r;  //FINAL REMINDER
   output [N-1:0] z;  //FINAL QUOTIENT
   output [N-1:0] r;  //FINAL REMINDER
 
-  //reg [N-1:0] reg_z;  //FINAL QUOTIENT
-  //reg [N-1:0] reg_r;  //FINAL REMINDER
   wire [N-1:0] z;
   wire [N-1:0] r;
 
@@ -258,17 +249,11 @@ module intdiv_intdiv(clock, reset, x, y, z, r);
 	end
 
 	//load operands for padjuster
-	//reg_p[STAGESBODY-1][N-1:N-STEPS] <= p[N-1:N-STEPS];
 	reg_padj <= padj;
 	reg_seladj <= seladj;
 
 	//load operands for negconv
 	reg_rflat <= rflat;
-
-	//compose outputs in their register
-	//reg_z[0] <= reg_seladj;
-	//reg_z[N-1:1] <= z[N-1:1];
-	//reg_r <= r;
 
 	for (pp=0; pp<STAGES; pp=pp+1)
 	begin
